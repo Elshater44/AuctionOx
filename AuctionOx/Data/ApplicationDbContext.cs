@@ -87,34 +87,57 @@ namespace AuctionOx.Data
 
         private void UpdateAuditFields()
         {
-            var entries = ChangeTracker.Entries()
+            var now = DateTime.UtcNow;
+
+            // Intercept physical deletes — convert to soft deletes automatically
+            var deletedEntries = ChangeTracker.Entries()
+                .Where(e => e.State == EntityState.Deleted);
+
+            foreach (var entityEntry in deletedEntries)
+            {
+                if (entityEntry.Entity is BaseEntity softDeletable)
+                {
+                    entityEntry.State = EntityState.Modified;
+                    softDeletable.IsDeleted = true;
+                    softDeletable.UpdatedAt = now;
+                }
+                // ApplicationUser also supports soft delete
+                else if (entityEntry.Entity is ApplicationUser appUser)
+                {
+                    entityEntry.State = EntityState.Modified;
+                    appUser.IsDeleted = true;
+                    appUser.UpdatedAt = now;
+                }
+            }
+
+            // Set audit timestamps on Added/Modified entries
+            var changedEntries = ChangeTracker.Entries()
                 .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified);
 
-            foreach (var entityEntry in entries)
+            foreach (var entityEntry in changedEntries)
             {
                 if (entityEntry.Entity is BaseEntity baseEntity)
                 {
                     if (entityEntry.State == EntityState.Added)
                     {
-                        baseEntity.CreatedAt = DateTime.UtcNow;
+                        baseEntity.CreatedAt = now;
                     }
                     else
                     {
-                        // Don't update CreatedAt if we're just modifying
                         entityEntry.Property(nameof(BaseEntity.CreatedAt)).IsModified = false;
-                        baseEntity.UpdatedAt = DateTime.UtcNow;
+                        baseEntity.UpdatedAt = now;
                     }
                 }
                 else if (entityEntry.Entity is ApplicationUser appUser)
                 {
                     if (entityEntry.State == EntityState.Added)
                     {
-                        appUser.CreatedAt = DateTime.UtcNow;
+                        appUser.CreatedAt = now;
                     }
                     else
                     {
                         entityEntry.Property(nameof(ApplicationUser.CreatedAt)).IsModified = false;
-                        appUser.UpdatedAt = DateTime.UtcNow;
+                        appUser.UpdatedAt = now;
                     }
                 }
             }

@@ -43,6 +43,9 @@ namespace AuctionOx.Services.Implementations
             if (auction.Status != ItemStatus.Active) throw new Exception("Auction is not active.");
             
             if (auction.SellerId == userId) throw new Exception("Sellers cannot bid on their own auctions.");
+
+            // Auction must have started
+            if (DateTime.UtcNow < auction.StartTime) throw new Exception("This auction has not started yet.");
             
             if (DateTime.UtcNow > auction.EndTime) throw new Exception("Auction has already ended.");
 
@@ -57,15 +60,18 @@ namespace AuctionOx.Services.Implementations
                 auction.EndTime = DateTime.UtcNow;
             }
 
-            // Anti-Sniping Logic
-            var timeRemaining = auction.EndTime - DateTime.UtcNow;
-            if (timeRemaining.TotalMinutes < auction.AntiSnipingMinutes && auction.Status == ItemStatus.Active)
+            // Anti-Sniping Logic: reset EndTime to now + window (not cumulative)
+            if (auction.Status == ItemStatus.Active)
             {
-                auction.EndTime = auction.EndTime.AddMinutes(auction.AntiSnipingMinutes);
+                var antiSnipingWindow = TimeSpan.FromMinutes(auction.AntiSnipingMinutes);
+                var timeRemaining = auction.EndTime - DateTime.UtcNow;
+                if (timeRemaining < antiSnipingWindow)
+                {
+                    auction.EndTime = DateTime.UtcNow.Add(antiSnipingWindow);
+                }
             }
 
-            // Unmark previous winning bid (optional logic, since only the final one at EndTime is truly winning)
-            // But we'll mark this new bid as the tentative winning bid
+            // Unmark previous winning bids
             foreach (var existingBid in auction.Bids.Where(b => b.IsWinningBid))
             {
                 existingBid.IsWinningBid = false;
