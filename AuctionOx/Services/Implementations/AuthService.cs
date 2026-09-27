@@ -69,7 +69,7 @@ namespace AuctionOx.Services.Implementations
             return new UserProfileDto
             {
                 Id = user.Id,
-                Email = user.Email!,
+                Email = user.Email ?? string.Empty,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 CreatedAt = user.CreatedAt
@@ -116,7 +116,7 @@ namespace AuctionOx.Services.Implementations
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
                 new Claim(ClaimTypes.NameIdentifier, user.Id)
             };
 

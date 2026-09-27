@@ -59,42 +59,17 @@ namespace AuctionOx.Services.Implementations
                     if (request.BidAmount <= auction.CurrentPrice)
                         throw new AuctionOx.Exceptions.BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
 
-                    if (auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value)
+                    bool isBuyItNow = auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value;
+                    if (isBuyItNow)
                     {
-                        // Force it to BuyItNowPrice if they overbid BuyItNow
-                        request.BidAmount = auction.BuyItNowPrice.Value;
-                        auction.Status = ItemStatus.Completed;
-                        auction.EndTime = DateTime.UtcNow;
+                        request.BidAmount = auction.BuyItNowPrice!.Value;
                     }
 
-                    // Anti-Sniping Logic: reset EndTime to now + window (not cumulative)
-                    if (auction.Status == ItemStatus.Active)
-                    {
-                        var antiSnipingWindow = TimeSpan.FromMinutes(auction.AntiSnipingMinutes);
-                        var timeRemaining = auction.EndTime - DateTime.UtcNow;
-                        if (timeRemaining < antiSnipingWindow)
-                        {
-                            auction.EndTime = DateTime.UtcNow.Add(antiSnipingWindow);
-                        }
-                    }
+                    var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
 
-                    // Unmark previous winning bids
-                    foreach (var existingBid in auction.Bids.Where(b => b.IsWinningBid))
-                    {
-                        existingBid.IsWinningBid = false;
-                        _unitOfWork.Bids.Update(existingBid);
-                    }
-
-                    var bid = new Bid
-                    {
-                        AuctionItemId = auctionId,
-                        BidderId = userId,
-                        BidAmount = request.BidAmount,
-                        BidTime = DateTime.UtcNow,
-                        IsWinningBid = true
-                    };
-
-                    auction.CurrentPrice = bid.BidAmount;
+                    // EF tracking automatically tracks items we mutate. But to be safe if they aren't fully tracked,
+                    // we could call _unitOfWork.Bids.Update on previous bids. However, since auction is loaded with Includes, they are tracked.
+                    // We just need to add the new bid.
                     
                     await _unitOfWork.Bids.AddAsync(bid);
                     _unitOfWork.Auctions.Update(auction);

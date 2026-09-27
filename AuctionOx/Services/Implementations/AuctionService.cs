@@ -229,7 +229,9 @@ namespace AuctionOx.Services.Implementations
             {
                 try
                 {
-                    var auction = await _unitOfWork.Auctions.GetByIdAsync(id);
+                    var auction = await _unitOfWork.Auctions.Query()
+                        .Include(a => a.Bids)
+                        .FirstOrDefaultAsync(a => a.Id == id);
                     
                     if (auction == null || auction.Status != ItemStatus.Active || auction.BuyItNowPrice == null)
                         return false;
@@ -245,19 +247,10 @@ namespace AuctionOx.Services.Implementations
                     if (auction.SellerId == userId)
                         throw new AuctionOx.Exceptions.BusinessRuleException("You cannot buy your own auction.");
 
-                    // Create winning bid
-                    var bid = new Bid
-                    {
-                        AuctionItemId = id,
-                        BidAmount = auction.BuyItNowPrice.Value,
-                        BidTime = DateTime.UtcNow,
-                        BidderId = userId,
-                        IsWinningBid = true
-                    };
-
-                    auction.CurrentPrice = bid.BidAmount;
-                    auction.Status = ItemStatus.Completed;
-                    auction.EndTime = DateTime.UtcNow;
+                    // Use the helper to create the winning bid and close the auction.
+                    // This also handles unmarking previous winning bids if the auction had any.
+                    var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(
+                        auction, userId, auction.BuyItNowPrice.Value, isBuyItNow: true);
 
                     await _unitOfWork.Bids.AddAsync(bid);
                     _unitOfWork.Auctions.Update(auction);
