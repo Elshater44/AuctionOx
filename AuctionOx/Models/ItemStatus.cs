@@ -5,6 +5,7 @@ namespace AuctionOx.Models
         Draft,
         Active,
         Completed,
-        Cancelled
+        Cancelled,
+        Suspended
     }
 }

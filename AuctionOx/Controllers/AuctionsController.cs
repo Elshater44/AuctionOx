@@ -111,5 +111,22 @@ namespace AuctionOx.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("admin/{id}")]
+        public async Task<IActionResult> AdminDeleteAuction(int id)
+        {
+            var deleted = await _auctionService.AdminDeleteAuctionAsync(id);
+            if (!deleted) return NotFound();
+            return NoContent();
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("admin/{id}/suspend")]
+        public async Task<IActionResult> AdminSuspendAuction(int id)
+        {
+            var suspended = await _auctionService.SuspendAuctionAsync(id);
+            if (!suspended) return NotFound();
+            return Ok(new { message = "Auction suspended successfully." });
+        }
     }
 }

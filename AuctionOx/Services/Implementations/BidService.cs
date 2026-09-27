@@ -14,11 +14,13 @@ namespace AuctionOx.Services.Implementations
     {
         private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly Microsoft.Extensions.Logging.ILogger<BidService> _logger;
 
-        public BidService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper)
+        public BidService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper, Microsoft.Extensions.Logging.ILogger<BidService> logger)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _logger = logger;
         }
 
         public async Task<List<BidDto>> GetBidsForAuctionAsync(int auctionId)
@@ -43,19 +45,19 @@ namespace AuctionOx.Services.Implementations
                         .Include(a => a.Bids)
                         .FirstOrDefaultAsync(a => a.Id == auctionId);
 
-                    if (auction == null) throw new Exception("Auction not found.");
+                    if (auction == null) throw new AuctionOx.Exceptions.BusinessRuleException("Auction not found.");
                     
-                    if (auction.Status != ItemStatus.Active) throw new Exception("Auction is not active.");
+                    if (auction.Status != ItemStatus.Active) throw new AuctionOx.Exceptions.BusinessRuleException("Auction is not active.");
                     
-                    if (auction.SellerId == userId) throw new Exception("Sellers cannot bid on their own auctions.");
+                    if (auction.SellerId == userId) throw new AuctionOx.Exceptions.BusinessRuleException("Sellers cannot bid on their own auctions.");
 
                     // Auction must have started
-                    if (DateTime.UtcNow < auction.StartTime) throw new Exception("This auction has not started yet.");
+                    if (DateTime.UtcNow < auction.StartTime) throw new AuctionOx.Exceptions.BusinessRuleException("This auction has not started yet.");
                     
-                    if (DateTime.UtcNow > auction.EndTime) throw new Exception("Auction has already ended.");
+                    if (DateTime.UtcNow > auction.EndTime) throw new AuctionOx.Exceptions.BusinessRuleException("Auction has already ended.");
 
                     if (request.BidAmount <= auction.CurrentPrice)
-                        throw new Exception($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
+                        throw new AuctionOx.Exceptions.BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
 
                     if (auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value)
                     {
@@ -102,13 +104,15 @@ namespace AuctionOx.Services.Implementations
                         .Include(b => b.Bidder)
                         .FirstOrDefaultAsync(b => b.Id == bid.Id);
 
+                    _logger.LogInformation("Bid of {Amount} successfully placed on auction {AuctionId} by user {UserId}.", bid.BidAmount, auctionId, userId);
+
                     return _mapper.Map<BidDto>(bidWithNav ?? bid);
                 }
                 catch (DbUpdateConcurrencyException)
                 {
                     if (retryCount == maxRetries - 1)
                     {
-                        throw new Exception("The auction was updated by another user. Please refresh and try again.");
+                        throw new AuctionOx.Exceptions.BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
                     }
                     // Detach all entries so the next attempt pulls fresh data
                     // Since we use scoped unit of work, we can just let the loop continue and query again,
@@ -120,7 +124,7 @@ namespace AuctionOx.Services.Implementations
                 }
             }
 
-            throw new Exception("Failed to place bid after multiple attempts.");
+            throw new AuctionOx.Exceptions.BusinessRuleException("Failed to place bid after multiple attempts.");
         }
 
         public async Task<List<BidDto>> GetMyBidsAsync(string userId)

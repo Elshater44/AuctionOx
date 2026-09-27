@@ -11,6 +11,9 @@ namespace AuctionOx.Models
         public DateTime? UpdatedAt { get; set; }
         public bool IsDeleted { get; set; }
 
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
+
         public ICollection<AuctionItem> AuctionsCreated { get; set; } = new List<AuctionItem>();
         public ICollection<Bid> BidsPlaced { get; set; } = new List<Bid>();
     }

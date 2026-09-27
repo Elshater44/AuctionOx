@@ -7,11 +7,14 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Global Exception Handling (Problem Details)
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<AuctionOx.Infrastructure.GlobalExceptionHandler>();
 
 // Add CORS Policy
 builder.Services.AddCors(options =>
@@ -106,6 +109,13 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddControllers();
+
+// Register FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<AuctionOx.Validators.CreateAuctionRequestValidator>();
+
+// Register Background Services
+builder.Services.AddHostedService<AuctionOx.BackgroundServices.AuctionCloserService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddEndpointsApiExplorer();
