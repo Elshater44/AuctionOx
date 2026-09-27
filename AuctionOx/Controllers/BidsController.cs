@@ -6,10 +6,13 @@ using AuctionOx.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.AspNetCore.RateLimiting;
+
 namespace AuctionOx.Controllers
 {
     [ApiController]
     [Route("api/auctions/{auctionId}/bids")]
+    [EnableRateLimiting("BidLimiter")]
     public class BidsController : ControllerBase
     {
         private readonly IBidService _bidService;

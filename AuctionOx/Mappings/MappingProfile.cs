@@ -22,12 +22,15 @@ namespace AuctionOx.Mappings
             // Bid Mappings
             CreateMap<Bid, BidDto>()
                 .ForMember(dest => dest.BidderName, 
-                           opt => opt.MapFrom(src => $"{src.Bidder!.FirstName} {src.Bidder!.LastName}".Trim()));
+                           opt => opt.MapFrom(src => src.Bidder != null && !string.IsNullOrEmpty(src.Bidder.FirstName) 
+                               ? $"{src.Bidder.FirstName[0]}***" : "Anonymous"));
 
             // Auction Mappings
             CreateMap<AuctionItem, AuctionItemDto>()
                 .ForMember(dest => dest.SellerName, 
-                           opt => opt.MapFrom(src => $"{src.Seller!.FirstName} {src.Seller!.LastName}".Trim()))
+                           opt => opt.MapFrom(src => src.Seller != null 
+                               ? $"{src.Seller.FirstName} {src.Seller.LastName}".Trim() 
+                               : "Unknown"))
                 .ForMember(dest => dest.CategoryName, 
                            opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : "Unknown"))
                 .ForMember(dest => dest.BidCount, 

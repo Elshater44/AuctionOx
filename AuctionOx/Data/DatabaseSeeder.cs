@@ -11,6 +11,7 @@ namespace AuctionOx.Data
         {
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<AuctionOx.Models.ApplicationUser>>();
+            var configuration = serviceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
 
             string[] roleNames = { "Admin", "User" };
 
@@ -38,7 +39,8 @@ namespace AuctionOx.Data
                     EmailConfirmed = true
                 };
 
-                var createPowerUser = await userManager.CreateAsync(newAdmin, "AdminPassword123!");
+                var adminPassword = configuration["AdminPassword"] ?? "AdminPassword123!"; // fallback for local dev if not set
+                var createPowerUser = await userManager.CreateAsync(newAdmin, adminPassword);
                 if (createPowerUser.Succeeded)
                 {
                     await userManager.AddToRoleAsync(newAdmin, "Admin");

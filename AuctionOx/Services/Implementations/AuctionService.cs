@@ -195,41 +195,60 @@ namespace AuctionOx.Services.Implementations
 
         public async Task<bool> BuyItNowAsync(int id, string userId)
         {
-            var auction = await _unitOfWork.Auctions.GetByIdAsync(id);
-            
-            if (auction == null || auction.Status != ItemStatus.Active || auction.BuyItNowPrice == null)
-                return false;
-
-            // Cannot buy an expired auction
-            if (DateTime.UtcNow > auction.EndTime)
-                throw new InvalidOperationException("This auction has already ended.");
-
-            // Cannot buy if competitive bids have already exceeded the buy-it-now price
-            if (auction.CurrentPrice >= auction.BuyItNowPrice.Value)
-                throw new InvalidOperationException("Current bid price already meets or exceeds the Buy It Now price.");
-
-            if (auction.SellerId == userId)
-                throw new InvalidOperationException("You cannot buy your own auction.");
-
-            // Create winning bid
-            var bid = new Bid
+            int maxRetries = 3;
+            for (int retryCount = 0; retryCount < maxRetries; retryCount++)
             {
-                AuctionItemId = id,
-                BidAmount = auction.BuyItNowPrice.Value,
-                BidTime = DateTime.UtcNow,
-                BidderId = userId,
-                IsWinningBid = true
-            };
+                try
+                {
+                    var auction = await _unitOfWork.Auctions.GetByIdAsync(id);
+                    
+                    if (auction == null || auction.Status != ItemStatus.Active || auction.BuyItNowPrice == null)
+                        return false;
 
-            auction.CurrentPrice = bid.BidAmount;
-            auction.Status = ItemStatus.Completed;
-            auction.EndTime = DateTime.UtcNow;
+                    // Cannot buy an expired auction
+                    if (DateTime.UtcNow > auction.EndTime)
+                        throw new InvalidOperationException("This auction has already ended.");
 
-            await _unitOfWork.Bids.AddAsync(bid);
-            _unitOfWork.Auctions.Update(auction);
-            await _unitOfWork.CompleteAsync();
+                    // Cannot buy if competitive bids have already exceeded the buy-it-now price
+                    if (auction.CurrentPrice >= auction.BuyItNowPrice.Value)
+                        throw new InvalidOperationException("Current bid price already meets or exceeds the Buy It Now price.");
 
-            return true;
+                    if (auction.SellerId == userId)
+                        throw new InvalidOperationException("You cannot buy your own auction.");
+
+                    // Create winning bid
+                    var bid = new Bid
+                    {
+                        AuctionItemId = id,
+                        BidAmount = auction.BuyItNowPrice.Value,
+                        BidTime = DateTime.UtcNow,
+                        BidderId = userId,
+                        IsWinningBid = true
+                    };
+
+                    auction.CurrentPrice = bid.BidAmount;
+                    auction.Status = ItemStatus.Completed;
+                    auction.EndTime = DateTime.UtcNow;
+
+                    await _unitOfWork.Bids.AddAsync(bid);
+                    _unitOfWork.Auctions.Update(auction);
+                    await _unitOfWork.CompleteAsync();
+
+                    return true;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (retryCount == maxRetries - 1)
+                    {
+                        throw new InvalidOperationException("The auction was updated by another user. Please refresh and try again.");
+                    }
+                    if (_unitOfWork is AuctionOx.Repositories.Implementations.UnitOfWork uow && uow.Context != null)
+                    {
+                        uow.Context.ChangeTracker.Clear();
+                    }
+                }
+            }
+            return false;
         }
     }
 }

@@ -22,6 +22,9 @@ namespace AuctionOx.Models
         public int AntiSnipingMinutes { get; set; } = 5; // Default to 5 minutes extension
         public ItemStatus Status { get; set; } = ItemStatus.Draft;
         
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
+        
         [MaxLength(500)]
         public string? ImageUrl { get; set; }
 

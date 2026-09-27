@@ -8,6 +8,7 @@ namespace AuctionOx.Repositories.Implementations
     public class UnitOfWork : IUnitOfWork
     {
         private readonly ApplicationDbContext _context;
+        public ApplicationDbContext Context => _context;
 
         public IRepository<Category> Categories { get; private set; }
         public IRepository<AuctionItem> Auctions { get; private set; }
