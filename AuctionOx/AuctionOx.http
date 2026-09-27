@@ -1,0 +1,6 @@
+@AuctionOx_HostAddress = http://localhost:5218
+
+GET {{AuctionOx_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
