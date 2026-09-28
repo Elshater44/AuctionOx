@@ -1,14 +1,14 @@
 using System;
-using System.ComponentModel.DataAnnotations;
+
 
 namespace AuctionOx.DTOs.Auctions
 {
     public class UpdateAuctionRequest
     {
-        [Required, MaxLength(200)]
+        
         public string Title { get; set; } = string.Empty;
 
-        [Required]
+        
         public string Description { get; set; } = string.Empty;
 
         public decimal? BuyItNowPrice { get; set; }
@@ -18,7 +18,7 @@ namespace AuctionOx.DTOs.Auctions
 
         public int CategoryId { get; set; }
 
-        [MaxLength(500)]
+        
         public string? ImageUrl { get; set; }
     }
 }
