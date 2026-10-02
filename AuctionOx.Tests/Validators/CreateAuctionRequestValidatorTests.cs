@@ -1,8 +1,6 @@
-using System;
 using AuctionOx.DTOs.Auctions;
 using AuctionOx.Validators;
 using FluentAssertions;
-using Xunit;
 
 namespace AuctionOx.Tests.Validators
 {
@@ -80,6 +78,47 @@ namespace AuctionOx.Tests.Validators
             result.IsValid.Should().BeFalse();
             result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateAuctionRequest.BuyItNowPrice))
                 .Which.ErrorMessage.Should().Contain("Buy It Now price must be greater than starting price");
+        }
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-10)]
+        public void Validate_StartingPrice_Should_GreaterThanZero_With_Values_EqualToOrLessThan_Zero(decimal startingPrice)
+        {
+
+            var request = CreateValidRequest();
+
+            request.StartingPrice = startingPrice;
+
+            var result = _validator.Validate(request);
+
+            result.IsValid.Should().BeFalse();
+
+        }
+        [Fact]
+        public void Validate_StartTime_Should_BeInTheFuture()
+        {
+            var request = CreateValidRequest();
+            request.StartTime = DateTime.UtcNow.AddMinutes(-6); // 5 minutes in the past
+            var result = _validator.Validate(request);
+            result.IsValid.Should().BeFalse();
+            result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateAuctionRequest.StartTime))
+                .Which.ErrorMessage.Should().Contain("Start time cannot be in the past.");
+        }
+
+        [Theory]
+        [InlineData(-1)] // End time before start time
+        [InlineData(0)]  // End time same as start time
+        public void Validate_EndTime_Should_BeAfter_StartTime(int endTimeOffsetMinutes)
+        {
+            var request = CreateValidRequest();
+            request.StartTime = DateTime.UtcNow.AddMinutes(10);
+            request.EndTime = request.StartTime.AddMinutes(endTimeOffsetMinutes);
+
+            var result = _validator.Validate(request);
+
+            result.IsValid.Should().BeFalse();
+            result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateAuctionRequest.EndTime))
+                .Which.ErrorMessage.Should().Contain("End time must be after start time.");
         }
     }
 }
