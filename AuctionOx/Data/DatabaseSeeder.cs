@@ -46,6 +46,29 @@ namespace AuctionOx.Data
                     await userManager.AddToRoleAsync(newAdmin, "Admin");
                 }
             }
+
+            // Seed Default Regular User
+            var regularEmail = "user@auctionox.com";
+            var regularUser = await userManager.FindByEmailAsync(regularEmail);
+
+            if (regularUser == null)
+            {
+                var newUser = new AuctionOx.Models.ApplicationUser
+                {
+                    UserName = regularEmail,
+                    Email = regularEmail,
+                    FirstName = "Regular",
+                    LastName = "User",
+                    EmailConfirmed = true
+                };
+
+                var userPassword = configuration["UserPassword"] ?? "UserPassword123!";
+                var createUser = await userManager.CreateAsync(newUser, userPassword);
+                if (createUser.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(newUser, "User");
+                }
+            }
         }
     }
 }
