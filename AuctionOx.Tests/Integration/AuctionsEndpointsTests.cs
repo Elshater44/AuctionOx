@@ -1,12 +1,10 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Threading.Tasks;
 using AuctionOx.DTOs.Auctions;
 using AuctionOx.DTOs.Auth;
 using AuctionOx.DTOs.Common;
 using FluentAssertions;
-using Xunit;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 
 namespace AuctionOx.Tests.Integration
 {
@@ -51,11 +49,15 @@ namespace AuctionOx.Tests.Integration
         public async Task GetAuctions_Returns200Ok_WithPagedResult()
         {
             // Arrange
+            var client = await CreateAuthenticatedClientAsync("admin@auctionox.com", "AdminPassword123!");
 
             // Act
-
+            var response = await client.GetAsync("/api/auctions");
             // Assert
-
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            var result = await response.Content.ReadFromJsonAsync<PagedResult<AuctionItemDto>>();
+            result.Should().NotBeNull();
+            result.PageNumber.Should().Be(1);
         }
 
         // ── Test 2: Defensive Pagination Bounds (DoS Guard) ─────────────
@@ -67,11 +69,13 @@ namespace AuctionOx.Tests.Integration
         public async Task GetAuctions_WhenPageSizeExceedsLimit_ShouldClampTo100()
         {
             // Arrange
-
+            var client = await CreateAuthenticatedClientAsync("admin@auctionox.com", "AdminPassword123!");
             // Act
-
+            var response = await client.GetAsync("/api/auctions?pageSize=1000");
             // Assert
-
+            var result = await response.Content.ReadFromJsonAsync<PagedResult<AuctionItemDto>>();
+            result.Should().NotBeNull();
+            result.PageNumber.Should().Be(1);
         }
 
         // ── Test 3: Querying Non-Existent Auction ────────────────────────
@@ -82,11 +86,11 @@ namespace AuctionOx.Tests.Integration
         public async Task GetAuction_WhenIdDoesNotExist_Returns404NotFound()
         {
             // Arrange
-
+            var client = await CreateAuthenticatedClientAsync("admin@auctionox.com", "AdminPassword123!");
             // Act
-
+            var response = await client.GetAsync("/api/auctions/9999");
             // Assert
-
+            response.StatusCode.Should().Be(HttpStatusCode.NotFound);
         }
 
         // ── Test 4: Role-Based Authorization Guard (403 Forbidden) ───────
@@ -99,11 +103,11 @@ namespace AuctionOx.Tests.Integration
         public async Task AdminDeleteAuction_WhenCalledByNonAdmin_Returns403Forbidden()
         {
             // Arrange
-
+            var userClient = await CreateAuthenticatedClientAsync("user@auctionox.com", "UserPassword123!");
             // Act
-
+            var response = await userClient.DeleteAsync("/api/auctions/admin/1");
             // Assert
-
+            response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
         }
     }
 }
