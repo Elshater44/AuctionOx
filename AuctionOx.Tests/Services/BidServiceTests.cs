@@ -1,6 +1,3 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using AuctionOx.Data;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.Exceptions;
@@ -11,9 +8,7 @@ using AuctionOx.Services.Implementations;
 using AutoMapper;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Xunit;
 
 namespace AuctionOx.Tests.Services
 {
@@ -126,7 +121,9 @@ namespace AuctionOx.Tests.Services
             // Arrange — nothing to arrange, the database is empty!
 
             // Act & Assert
-
+            await FluentActions.Awaiting(() => _bidService.PlaceBidAsync(999, "user1", new PlaceBidRequest { BidAmount = 50m }))
+                .Should()
+                .ThrowAsync<BusinessRuleException>();
         }
 
 
@@ -138,9 +135,10 @@ namespace AuctionOx.Tests.Services
         public async Task PlaceBidAsync_WhenSellerBidsOnOwnAuction_ShouldThrowBusinessRuleException()
         {
             // Arrange
+            var auction = await SeedActiveAuctionAsync(sellerId: "seller1");
 
             // Act & Assert
-
+            await FluentActions.Awaiting(() => _bidService.PlaceBidAsync(auction.Id, "seller1", new PlaceBidRequest { BidAmount = 50m })).Should().ThrowAsync<BusinessRuleException>();
         }
 
 
@@ -155,12 +153,12 @@ namespace AuctionOx.Tests.Services
         [InlineData(50)]
         public async Task PlaceBidAsync_WhenBidIsTooLow_ShouldThrowBusinessRuleException(decimal bidAmount)
         {
-            // Arrange
-
-            // Act & Assert
-
+            // Arrange: auction current price is 100m
+            var auction = await SeedActiveAuctionAsync(sellerId: "seller2", currentPrice: 100m);
+            // Act & Assert: buyer1 bids bidAmount (either 100 or 50)
+            await FluentActions.Awaiting(() => _bidService.PlaceBidAsync(auction.Id, "buyer1", new PlaceBidRequest { BidAmount = bidAmount }))
+                .Should().ThrowAsync<BusinessRuleException>();
         }
-
 
         // ── Test 4 ──────────────────────────────────────────────────────
         // HINT: Use [Fact]. This is the HAPPY PATH — everything works correctly.
@@ -177,11 +175,16 @@ namespace AuctionOx.Tests.Services
         public async Task PlaceBidAsync_WhenBidIsValid_ShouldSaveBidAndUpdateAuctionPrice()
         {
             // Arrange
-
+            var auction = await SeedActiveAuctionAsync("sellerHappy1", 100m);
             // Act
-
+            var result = await _bidService.PlaceBidAsync(auction.Id, "seller1", new PlaceBidRequest { BidAmount = 150m });
             // Assert
+            result.Should().NotBeNull();
+            result.BidAmount.Should().Be(150m);
 
+            var updatedAuction = await _dbContext.Set<AuctionItem>().FindAsync(auction.Id);
+            updatedAuction.Should().NotBeNull();
+            updatedAuction!.CurrentPrice.Should().Be(150m);
         }
 
 
@@ -197,10 +200,18 @@ namespace AuctionOx.Tests.Services
         public async Task PlaceBidAsync_WhenBidMeetsBuyItNow_ShouldCompleteAuction()
         {
             // Arrange
-
+            var auction = await SeedActiveAuctionAsync("sellerLast1", currentPrice: 100m, buyItNowPrice: 200m);
             // Act
-
+            var res = await _bidService.PlaceBidAsync(auction.Id, "Buyer1", new PlaceBidRequest { BidAmount = 300m });
             // Assert
+            // 1. The returned bid should be clamped to the BuyItNowPrice (200m)
+            res.BidAmount.Should().Be(200m);
+            // 2. The auction in the database should be Completed with CurrentPrice = 200m
+            var updatedAuction = await _dbContext.Set<AuctionItem>().FindAsync(auction.Id);
+            updatedAuction.Should().NotBeNull();
+            updatedAuction!.Status.Should().Be(ItemStatus.Completed);
+            updatedAuction.CurrentPrice.Should().Be(200m);
+
 
         }
     }
