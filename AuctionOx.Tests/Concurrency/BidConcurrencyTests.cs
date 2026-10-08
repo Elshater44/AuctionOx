@@ -92,25 +92,99 @@ namespace AuctionOx.Tests.Concurrency
         // SCENARIO:
         //   An auction starts at $100.
         //   5 different bidders submit bids ($110, $120, $130, $140, $150) at the SAME time.
-        //
-        // HINT:
-        //   1. Create 5 test users using CreateTestUserAsync.
-        //   2. Create a test auction starting at 100m.
-        //   3. Create a list of 5 asynchronous tasks using Task.Run:
-        //      Each task creates its own scope via `using var scope = _factory.Services.CreateScope();`,
-        //      gets the `IBidService`, and calls `PlaceBidAsync(...)`.
-        //   4. Run all tasks simultaneously with `await Task.WhenAll(tasks)`.
-        //   5. Query the database for the auction:
-        //      Assert that `auction.CurrentPrice` is exactly $150 (the highest bid won!).
         [Fact]
         public async Task ConcurrentBids_WithAscendingAmounts_ShouldEndWithHighestBidAsCurrentPrice()
         {
             // Arrange
+            var seller = await CreateTestUserAsync("seller@test.com");
+            var user1 = await CreateTestUserAsync("user1@test.com");
+            var user2 = await CreateTestUserAsync("user2@test.com");
+            var user3 = await CreateTestUserAsync("user3@test.com");
+            var user4 = await CreateTestUserAsync("user4@test.com");
+            var user5 = await CreateTestUserAsync("user5@test.com");
 
             // Act
+            var auction = await CreateTestAuctionAsync(seller.Id, 100m);
+
+            var task1 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user1.Id, new PlaceBidRequest { BidAmount = 110m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null; // Outbid by a concurrent higher bid!
+                }
+            });
+
+            var task2 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user2.Id, new PlaceBidRequest { BidAmount = 120m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+
+            var task3 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user3.Id, new PlaceBidRequest { BidAmount = 130m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+
+            var task4 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user4.Id, new PlaceBidRequest { BidAmount = 140m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+
+            var task5 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user5.Id, new PlaceBidRequest { BidAmount = 150m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+
+            await Task.WhenAll(task1, task2, task3, task4, task5);
 
             // Assert
+            using var assertScope = _factory.Services.CreateScope();
+            var db = assertScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
+            var updatedAuction = await db.AuctionItems.FindAsync(auction.Id);
+            updatedAuction.Should().NotBeNull();
+            updatedAuction!.CurrentPrice.Should().Be(150m);
         }
 
         // ── Test 2: Identical Bid Price Collision ─────────────────────────

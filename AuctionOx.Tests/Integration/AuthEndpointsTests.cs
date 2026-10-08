@@ -1,9 +1,7 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Threading.Tasks;
 using AuctionOx.DTOs.Auth;
 using FluentAssertions;
-using Xunit;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace AuctionOx.Tests.Integration
 {
@@ -68,6 +66,33 @@ namespace AuctionOx.Tests.Integration
             authResponse!.Token.Should().NotBeNullOrEmpty();
             authResponse.RefreshToken.Should().NotBeNullOrEmpty();
             authResponse.Expiration.Should().BeAfter(System.DateTime.UtcNow);
+        }
+
+        [Fact]
+        public async Task Login_LoginWithWrongEmail_Return401()
+        {
+            var request = new LoginRequest
+            {
+                Email = "elshater@auction.ox",
+                Password = "123abc123"
+            };
+
+            var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+            response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        }
+        [Fact]
+        public async Task Login_LoginWithRightCredentials_Returns200()
+        {
+            var request = new LoginRequest
+            {
+                Email = "admin@auctionox.com",
+                Password = "AdminPassword123!"
+            };
+
+            var response = await _client.PostAsJsonAsync("/api/auth/login", request);
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
         }
     }
 }

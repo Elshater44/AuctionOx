@@ -1,10 +1,8 @@
-using System;
-using System.Security.Claims;
-using System.Threading.Tasks;
 using AuctionOx.DTOs.Auctions;
 using AuctionOx.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace AuctionOx.Controllers
 {
@@ -21,9 +19,9 @@ namespace AuctionOx.Controllers
 
         [HttpGet]
         public async Task<IActionResult> GetAuctions(
-            [FromQuery] int? categoryId, 
-            [FromQuery] string? status, 
-            [FromQuery] string? search, 
+            [FromQuery] int? categoryId,
+            [FromQuery] string? status,
+            [FromQuery] string? search,
             [FromQuery] string? sortBy,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 10)
