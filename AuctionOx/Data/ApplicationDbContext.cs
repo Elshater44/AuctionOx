@@ -127,12 +127,6 @@ namespace AuctionOx.Data
                         entityEntry.Property(nameof(BaseEntity.CreatedAt)).IsModified = false;
                         baseEntity.UpdatedAt = now;
                     }
-
-                    // For InMemory provider, simulate database-generated RowVersion concurrency tokens
-                    if (Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory" && entityEntry.Entity is AuctionItem auction)
-                    {
-                        auction.RowVersion = Guid.NewGuid().ToByteArray();
-                    }
                 }
                 else if (entityEntry.Entity is ApplicationUser appUser)
                 {

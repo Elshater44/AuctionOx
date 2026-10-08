@@ -34,72 +34,76 @@ namespace AuctionOx.Services.Implementations
             return _mapper.Map<List<BidDto>>(bids);
         }
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim> _auctionLocks = new();
+
         public async Task<BidDto> PlaceBidAsync(int auctionId, string userId, PlaceBidRequest request)
         {
-            int maxRetries = 3;
-            for (int retryCount = 0; retryCount < maxRetries; retryCount++)
+            var semaphore = _auctionLocks.GetOrAdd(auctionId, _ => new System.Threading.SemaphoreSlim(1, 1));
+            await semaphore.WaitAsync();
+            try
             {
-                try
+                int maxRetries = 3;
+                for (int retryCount = 0; retryCount < maxRetries; retryCount++)
                 {
-                    var auction = await _unitOfWork.Auctions.Query()
-                        .Include(a => a.Bids)
-                        .FirstOrDefaultAsync(a => a.Id == auctionId);
-
-                    if (auction == null) throw new AuctionOx.Exceptions.BusinessRuleException("Auction not found.");
-                    
-                    if (auction.Status != ItemStatus.Active) throw new AuctionOx.Exceptions.BusinessRuleException("Auction is not active.");
-                    
-                    if (auction.SellerId == userId) throw new AuctionOx.Exceptions.BusinessRuleException("Sellers cannot bid on their own auctions.");
-
-                    // Auction must have started
-                    if (DateTime.UtcNow < auction.StartTime) throw new AuctionOx.Exceptions.BusinessRuleException("This auction has not started yet.");
-                    
-                    if (DateTime.UtcNow > auction.EndTime) throw new AuctionOx.Exceptions.BusinessRuleException("Auction has already ended.");
-
-                    if (request.BidAmount <= auction.CurrentPrice)
-                        throw new AuctionOx.Exceptions.BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
-
-                    bool isBuyItNow = auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value;
-                    if (isBuyItNow)
+                    try
                     {
-                        request.BidAmount = auction.BuyItNowPrice!.Value;
+                        var auction = await _unitOfWork.Auctions.Query()
+                            .Include(a => a.Bids)
+                            .FirstOrDefaultAsync(a => a.Id == auctionId);
+
+                        if (auction == null) throw new AuctionOx.Exceptions.BusinessRuleException("Auction not found.");
+                        
+                        if (auction.Status != ItemStatus.Active) throw new AuctionOx.Exceptions.BusinessRuleException("Auction is not active.");
+                        
+                        if (auction.SellerId == userId) throw new AuctionOx.Exceptions.BusinessRuleException("Sellers cannot bid on their own auctions.");
+
+                        // Auction must have started
+                        if (DateTime.UtcNow < auction.StartTime) throw new AuctionOx.Exceptions.BusinessRuleException("This auction has not started yet.");
+                        
+                        if (DateTime.UtcNow > auction.EndTime) throw new AuctionOx.Exceptions.BusinessRuleException("Auction has already ended.");
+
+                        if (request.BidAmount <= auction.CurrentPrice)
+                            throw new AuctionOx.Exceptions.BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
+
+                        bool isBuyItNow = auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value;
+                        if (isBuyItNow)
+                        {
+                            request.BidAmount = auction.BuyItNowPrice!.Value;
+                        }
+
+                        var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
+
+                        await _unitOfWork.Bids.AddAsync(bid);
+                        _unitOfWork.Auctions.Update(auction);
+                        await _unitOfWork.CompleteAsync();
+
+                        var bidWithNav = await _unitOfWork.Bids.Query()
+                            .Include(b => b.Bidder)
+                            .FirstOrDefaultAsync(b => b.Id == bid.Id);
+
+                        _logger.LogInformation("Bid of {Amount} successfully placed on auction {AuctionId} by user {UserId}.", bid.BidAmount, auctionId, userId);
+
+                        return _mapper.Map<BidDto>(bidWithNav ?? bid);
                     }
-
-                    var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
-
-                    // EF tracking automatically tracks items we mutate. But to be safe if they aren't fully tracked,
-                    // we could call _unitOfWork.Bids.Update on previous bids. However, since auction is loaded with Includes, they are tracked.
-                    // We just need to add the new bid.
-                    
-                    await _unitOfWork.Bids.AddAsync(bid);
-                    _unitOfWork.Auctions.Update(auction);
-                    await _unitOfWork.CompleteAsync();
-
-                    var bidWithNav = await _unitOfWork.Bids.Query()
-                        .Include(b => b.Bidder)
-                        .FirstOrDefaultAsync(b => b.Id == bid.Id);
-
-                    _logger.LogInformation("Bid of {Amount} successfully placed on auction {AuctionId} by user {UserId}.", bid.BidAmount, auctionId, userId);
-
-                    return _mapper.Map<BidDto>(bidWithNav ?? bid);
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (retryCount == maxRetries - 1)
+                    catch (DbUpdateConcurrencyException)
                     {
-                        throw new AuctionOx.Exceptions.BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
-                    }
-                    // Detach all entries so the next attempt pulls fresh data
-                    // Since we use scoped unit of work, we can just let the loop continue and query again,
-                    // but we must clear EF's change tracker tracking
-                    if (_unitOfWork is AuctionOx.Repositories.Implementations.UnitOfWork uow && uow.Context != null)
-                    {
-                        uow.Context.ChangeTracker.Clear();
+                        if (retryCount == maxRetries - 1)
+                        {
+                            throw new AuctionOx.Exceptions.BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
+                        }
+                        if (_unitOfWork is AuctionOx.Repositories.Implementations.UnitOfWork uow && uow.Context != null)
+                        {
+                            uow.Context.ChangeTracker.Clear();
+                        }
                     }
                 }
+
+                throw new AuctionOx.Exceptions.BusinessRuleException("Failed to place bid after multiple attempts.");
             }
-
-            throw new AuctionOx.Exceptions.BusinessRuleException("Failed to place bid after multiple attempts.");
+            finally
+            {
+                semaphore.Release();
+            }
         }
 
         public async Task<List<BidDto>> GetMyBidsAsync(string userId)

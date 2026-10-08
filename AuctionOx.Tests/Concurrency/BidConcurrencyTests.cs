@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using AuctionOx.Data;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.Exceptions;
@@ -12,7 +8,6 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace AuctionOx.Tests.Concurrency
 {
@@ -203,11 +198,52 @@ namespace AuctionOx.Tests.Concurrency
         public async Task ConcurrentBids_WithIdenticalAmount_OnlyOneBidShouldSucceed()
         {
             // Arrange
-
+            var seller = await CreateTestUserAsync("seller@test.com");
+            var user1 = await CreateTestUserAsync("user1@test.com");
+            var user2 = await CreateTestUserAsync("user2@test.com");
+            var auction = await CreateTestAuctionAsync(seller.Id, 100m);
             // Act
 
-            // Assert
+            var task1 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user1.Id, new PlaceBidRequest { BidAmount = 120m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+            var task2 = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = _factory.Services.CreateScope();
+                    var bidService = scope.ServiceProvider.GetRequiredService<IBidService>();
+                    return await bidService.PlaceBidAsync(auction.Id, user2.Id, new PlaceBidRequest { BidAmount = 120m });
+                }
+                catch (BusinessRuleException)
+                {
+                    return null;
+                }
+            });
+            var res1 = await task1;
+            var res2 = await task2;
 
+            var results = new[] { res1, res2 };
+            results.Count(r => r != null).Should().Be(1);
+
+            // Assert
+            using var assertScope = _factory.Services.CreateScope();
+            var db = assertScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var updatedAuction = await db.AuctionItems.Include(x => x.Bids).FirstAsync(x => x.Id == auction.Id);
+            updatedAuction.Should().NotBeNull();
+            updatedAuction!.CurrentPrice.Should().Be(120m);
+            updatedAuction.Bids.Count.Should().Be(1);
         }
     }
 }
