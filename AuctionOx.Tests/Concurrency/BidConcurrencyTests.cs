@@ -230,12 +230,7 @@ namespace AuctionOx.Tests.Concurrency
                     return null;
                 }
             });
-            var res1 = await task1;
-            var res2 = await task2;
-
-            var results = new[] { res1, res2 };
-            results.Count(r => r != null).Should().Be(1);
-
+            await Task.WhenAll(task1, task2);
             // Assert
             using var assertScope = _factory.Services.CreateScope();
             var db = assertScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using AuctionOx.Data;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.Models;
 using AutoMapper;
@@ -52,14 +47,14 @@ namespace AuctionOx.Services.Implementations
                             .FirstOrDefaultAsync(a => a.Id == auctionId);
 
                         if (auction == null) throw new AuctionOx.Exceptions.BusinessRuleException("Auction not found.");
-                        
+
                         if (auction.Status != ItemStatus.Active) throw new AuctionOx.Exceptions.BusinessRuleException("Auction is not active.");
-                        
+
                         if (auction.SellerId == userId) throw new AuctionOx.Exceptions.BusinessRuleException("Sellers cannot bid on their own auctions.");
 
                         // Auction must have started
                         if (DateTime.UtcNow < auction.StartTime) throw new AuctionOx.Exceptions.BusinessRuleException("This auction has not started yet.");
-                        
+
                         if (DateTime.UtcNow > auction.EndTime) throw new AuctionOx.Exceptions.BusinessRuleException("Auction has already ended.");
 
                         if (request.BidAmount <= auction.CurrentPrice)
