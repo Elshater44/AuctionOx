@@ -1,14 +1,15 @@
 using AuctionOx.Data;
+using AuctionOx.Hubs;
 using AuctionOx.Models;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,9 +22,10 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(origin => true)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -41,18 +43,20 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1)
             }));
 
-    options.AddFixedWindowLimiter("AuthLimiter", opt => {
+    options.AddFixedWindowLimiter("AuthLimiter", opt =>
+    {
         opt.PermitLimit = 5;
         opt.Window = TimeSpan.FromMinutes(5);
         opt.QueueLimit = 0;
     });
 
-    options.AddFixedWindowLimiter("BidLimiter", opt => {
+    options.AddFixedWindowLimiter("BidLimiter", opt =>
+    {
         opt.PermitLimit = 20;
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueLimit = 0;
     });
-    
+
     options.RejectionStatusCode = 429;
 });
 
@@ -61,7 +65,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => 
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;
 })
@@ -117,7 +121,10 @@ builder.Services.AddValidatorsFromAssemblyContaining<AuctionOx.Validators.Create
 // Register Background Services
 builder.Services.AddHostedService<AuctionOx.BackgroundServices.AuctionCloserService>();
 
+builder.Services.AddSignalR();
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -147,6 +154,8 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -168,7 +177,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -182,7 +190,7 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "An error occurred while seeding the database.");
     }
 }
-
+app.MapHub<BiddingHub>("/hubs/bidding");
 app.Run();
 
 public partial class Program { }

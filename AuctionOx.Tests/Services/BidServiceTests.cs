@@ -1,14 +1,18 @@
 using AuctionOx.Data;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.Exceptions;
+using AuctionOx.Hubs;
+using AuctionOx.Hubs.Clients;
 using AuctionOx.Mappings;
 using AuctionOx.Models;
 using AuctionOx.Repositories.Implementations;
 using AuctionOx.Services.Implementations;
 using AutoMapper;
 using FluentAssertions;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace AuctionOx.Tests.Services
 {
@@ -48,7 +52,9 @@ namespace AuctionOx.Tests.Services
             // Wire up real UnitOfWork and real BidService — no fakes needed!
             var unitOfWork = new UnitOfWork(_dbContext);
             var logger = NullLogger<BidService>.Instance;
-            _bidService = new BidService(unitOfWork, _mapper, logger);
+            var mockHubContext = new Mock<IHubContext<BiddingHub, IBiddingClient>>();
+
+            _bidService = new BidService(unitOfWork, _mapper, logger, mockHubContext.Object);
         }
 
         // =====================================================================

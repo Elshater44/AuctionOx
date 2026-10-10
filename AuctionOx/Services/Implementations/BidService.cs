@@ -1,6 +1,9 @@
 using AuctionOx.DTOs.Bids;
+using AuctionOx.Hubs;
+using AuctionOx.Hubs.Clients;
 using AuctionOx.Models;
 using AutoMapper;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuctionOx.Services.Implementations
@@ -10,12 +13,14 @@ namespace AuctionOx.Services.Implementations
         private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly Microsoft.Extensions.Logging.ILogger<BidService> _logger;
+        private readonly IHubContext<BiddingHub, IBiddingClient> _biddingHubContext;
 
-        public BidService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper, Microsoft.Extensions.Logging.ILogger<BidService> logger)
+        public BidService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper, Microsoft.Extensions.Logging.ILogger<BidService> logger, IHubContext<BiddingHub, IBiddingClient> biddingHubContext)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _logger = logger;
+            _biddingHubContext = biddingHubContext;
         }
 
         public async Task<List<BidDto>> GetBidsForAuctionAsync(int auctionId)
@@ -77,6 +82,8 @@ namespace AuctionOx.Services.Implementations
                             .FirstOrDefaultAsync(b => b.Id == bid.Id);
 
                         _logger.LogInformation("Bid of {Amount} successfully placed on auction {AuctionId} by user {UserId}.", bid.BidAmount, auctionId, userId);
+                        var liveBiddingData = await GetBidsForAuctionAsync(auctionId);
+                        await _biddingHubContext.Clients.Group(auctionId.ToString()).ReceiveLiveBidData(liveBiddingData);
 
                         return _mapper.Map<BidDto>(bidWithNav ?? bid);
                     }

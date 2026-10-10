@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuctionOx - SignalR Live Bidding Test</title>
+    <!-- Import the official Microsoft SignalR client from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+        .header { border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-bottom: 20px; }
+        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; flex-grow: 1; }
+        button { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .bid-list { list-style-type: none; padding: 0; }
+        .bid-item { background: #e9ecef; margin-bottom: 8px; padding: 12px; border-radius: 4px; border-left: 4px solid #28a745; display: flex; justify-content: space-between; }
+        .price { font-size: 1.2em; font-weight: bold; color: #28a745; }
+        #status { font-weight: bold; color: #dc3545; }
+        .connected { color: #28a745 !important; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="header">
+        <h2>🔴 Live Bidding Console</h2>
+        <p>Status: <span id="status">Disconnected</span></p>
+    </div>
+
+    <div class="controls">
+        <input type="number" id="auctionIdInput" placeholder="Enter Auction ID (e.g., 1)">
+        <button id="joinBtn" onclick="joinAuction()">Join Auction Room</button>
+    </div>
+
+    <h3>Live Bids</h3>
+    <ul id="bidsList" class="bid-list">
+        <li>Waiting for bids...</li>
+    </ul>
+</div>
+
+<script>
+    // 1. Setup the connection to your API's Hub
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("https://localhost:7256/hubs/bidding")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    // 2. Define what happens when the server sends "ReceiveLiveBidData"
+    connection.on("ReceiveLiveBidData", (bids) => {
+        console.log("Received new bid data:", bids);
+        
+        const list = document.getElementById("bidsList");
+        list.innerHTML = ""; // Clear current list
+
+        if (bids.length === 0) {
+            list.innerHTML = "<li>No bids yet.</li>";
+            return;
+        }
+
+        // Loop through the bids and add them to the HTML list
+        bids.forEach(bid => {
+            const li = document.createElement("li");
+            li.className = "bid-item";
+            
+            // Format the date
+            const time = new Date(bid.bidTime).toLocaleTimeString();
+            
+            li.innerHTML = `
+                <span>Bidder: ${bid.bidderName} <br><small>${time}</small></span>
+                <span class="price">$${bid.bidAmount.toFixed(2)}</span>
+            `;
+            list.appendChild(li);
+        });
+    });
+
+    // 3. Start the connection
+    async function startConnection() {
+        try {
+            await connection.start();
+            document.getElementById("status").textContent = "Connected to Server";
+            document.getElementById("status").className = "connected";
+            console.log("SignalR Connected.");
+        } catch (err) {
+            console.error(err);
+            setTimeout(startConnection, 5000);
+        }
+    }
+
+    // 4. Call the 'JoinAuctionRoom' method on the C# Hub
+    async function joinAuction() {
+        const auctionId = document.getElementById("auctionIdInput").value;
+        if (!auctionId) return alert("Please enter an Auction ID");
+
+        try {
+            // This calls public async Task JoinAuctionRoom(int auctionId) in your BiddingHub.cs
+            await connection.invoke("JoinAuctionRoom", parseInt(auctionId));
+            
+            document.getElementById("joinBtn").textContent = `Listening to Auction #${auctionId}`;
+            document.getElementById("joinBtn").style.backgroundColor = "#28a745";
+            document.getElementById("bidsList").innerHTML = "<li>Listening for live bids... Place a bid in Swagger!</li>";
+            
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    // Initialize
+    startConnection();
+</script>
+
+</body>
+</html>
