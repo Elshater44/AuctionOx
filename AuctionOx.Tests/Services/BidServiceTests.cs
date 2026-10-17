@@ -53,6 +53,10 @@ namespace AuctionOx.Tests.Services
             var unitOfWork = new UnitOfWork(_dbContext);
             var logger = NullLogger<BidService>.Instance;
             var mockHubContext = new Mock<IHubContext<BiddingHub, IBiddingClient>>();
+            var mockClients = new Mock<IHubClients<IBiddingClient>>();
+            var mockClient = new Mock<IBiddingClient>();
+            mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockClient.Object);
+            mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
 
             _bidService = new BidService(unitOfWork, _mapper, logger, mockHubContext.Object);
         }

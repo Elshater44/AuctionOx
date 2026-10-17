@@ -1,0 +1,39 @@
+name: AuctionOx CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    name: Build, Test & Container Check
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up .NET 10 SDK
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Step 3: Restore dependencies
+      - name: Restore NuGet packages
+        run: dotnet restore
+
+      # Step 4: Compile solution in Release mode
+      - name: Build solution
+        run: dotnet build --no-restore --configuration Release
+
+      # Step 5: Execute all 28 tests using Testcontainers (real SQL Server on Ubuntu)
+      - name: Run tests with Testcontainers
+        run: dotnet test --no-build --configuration Release --verbosity normal
+
+      # Step 6: Verify the production Dockerfile builds cleanly
+      - name: Verify Dockerfile Build
+        run: docker build -t auctionox-api ./AuctionOx
