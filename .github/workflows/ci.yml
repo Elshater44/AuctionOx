@@ -32,6 +32,11 @@ jobs:
 
       # Step 5: Execute all 28 tests using Testcontainers (real SQL Server on Ubuntu)
       - name: Run tests with Testcontainers
+        env:
+          JwtSettings__Secret: VerySecretTestingKeyWithAtLeast32BytesForHmacSha256!
+          JwtSettings__Issuer: AuctionOxAPI
+          JwtSettings__Audience: AuctionOxClients
+          JwtSettings__ExpiryMinutes: "60"
         run: dotnet test --no-build --configuration Release --verbosity normal
 
       # Step 6: Verify the production Dockerfile builds cleanly
