@@ -100,15 +100,19 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
+    var currentJwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var currentSecretKey = currentJwtSettings.GetValue<string>("Secret") ?? secretKey;
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings.GetValue<string>("Issuer"),
-        ValidAudience = jwtSettings.GetValue<string>("Audience"),
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        ValidIssuer = currentJwtSettings.GetValue<string>("Issuer"),
+        ValidAudience = currentJwtSettings.GetValue<string>("Audience"),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(currentSecretKey)),
+        RoleClaimType = System.Security.Claims.ClaimTypes.Role
     };
 });
 

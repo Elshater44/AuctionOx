@@ -33,6 +33,8 @@ namespace AuctionOx.Tests.Integration
                 Password = password
             });
 
+            loginResponse.EnsureSuccessStatusCode();
+
             var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.Token);
             return client;

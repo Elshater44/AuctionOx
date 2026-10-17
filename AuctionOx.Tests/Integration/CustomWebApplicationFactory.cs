@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.MsSql;
 using Xunit;
@@ -41,6 +42,17 @@ namespace AuctionOx.Tests.Integration
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(new System.Collections.Generic.Dictionary<string, string?>
+                {
+                    ["JwtSettings:Secret"] = "VerySecretTestingKeyWithAtLeast32BytesForHmacSha256!",
+                    ["JwtSettings:Issuer"] = "AuctionOxAPI",
+                    ["JwtSettings:Audience"] = "AuctionOxClients",
+                    ["JwtSettings:ExpiryMinutes"] = "60"
+                });
+            });
+
             builder.ConfigureTestServices(services =>
             {
                 // Remove existing SQL Server registration
