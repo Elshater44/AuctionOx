@@ -1,6 +1,11 @@
 using AuctionOx.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace AuctionOx.Infrastructure
 {
@@ -36,6 +41,15 @@ namespace AuctionOx.Infrastructure
                 problemDetails.Title = "Unauthorized";
                 problemDetails.Status = StatusCodes.Status401Unauthorized;
                 problemDetails.Detail = exception.Message;
+            }
+            else if (exception is DbUpdateException dbEx && 
+                     dbEx.InnerException is Microsoft.Data.SqlClient.SqlException sqlEx && 
+                     sqlEx.Number == 547) // Foreign Key constraint violation
+            {
+                httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                problemDetails.Title = "Foreign Key Conflict";
+                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Detail = "A referenced record (user or category) was not found in the database. Please verify inputs or re-login.";
             }
             else
             {

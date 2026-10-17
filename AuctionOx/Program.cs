@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 
@@ -112,7 +113,58 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = currentJwtSettings.GetValue<string>("Issuer"),
         ValidAudience = currentJwtSettings.GetValue<string>("Audience"),
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(currentSecretKey)),
-        RoleClaimType = System.Security.Claims.ClaimTypes.Role
+        RoleClaimType = ClaimTypes.Role
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = async context =>
+        {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            if (context.Principal?.Identity is not ClaimsIdentity claimsIdentity) return;
+
+            var userId = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var email = claimsIdentity.FindFirst(ClaimTypes.Email)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                context.Fail("Missing user identifier claim.");
+                return;
+            }
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                // Auto-healing fallback: If user was re-seeded with a different ID, recover using email
+                if (!string.IsNullOrEmpty(email))
+                {
+                    user = await userManager.FindByEmailAsync(email);
+                    if (user != null)
+                    {
+                        var idClaim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
+                        if (idClaim != null)
+                        {
+                            claimsIdentity.RemoveClaim(idClaim);
+                        }
+                        claimsIdentity.AddClaim(new Claim(ClaimTypes.NameIdentifier, user.Id));
+                        return;
+                    }
+                }
+
+                // If user doesn't exist by ID or Email, fail auth with 401
+                context.Fail("User account no longer exists in database.");
+            }
+        }
     };
 });
 

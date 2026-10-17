@@ -15,7 +15,9 @@ namespace AuctionOx.DTOs.Auctions
         public DateTime EndTime { get; set; }
         public ItemStatus Status { get; set; }
         public string? ImageUrl { get; set; }
+        public string SellerId { get; set; } = string.Empty;
         public string SellerName { get; set; } = string.Empty;
+        public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public int BidCount { get; set; }
     }

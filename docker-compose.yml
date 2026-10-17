@@ -45,6 +45,23 @@ services:
     networks:
       - auctionox-network
 
+  # ----------------------------------------------------
+  # 3. AuctionOx Frontend Service (React + Vite + Nginx)
+  # ----------------------------------------------------
+  frontend:
+    image: auctionox-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: auctionox-frontend
+    ports:
+      - "5173:80"
+      - "3000:80"
+    depends_on:
+      - api
+    networks:
+      - auctionox-network
+
 # ----------------------------------------------------
 # Networks & Persistent Volumes
 # ----------------------------------------------------

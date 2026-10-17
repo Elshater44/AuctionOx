@@ -121,21 +121,33 @@ namespace AuctionOx.Services.Implementations
             return _mapper.Map<AuctionItemDto>(auctionWithNav);
         }
 
-        public async Task<AuctionItemDto?> UpdateAuctionAsync(int id, string userId, UpdateAuctionRequest request)
+        public async Task<AuctionItemDto?> UpdateAuctionAsync(int id, string userId, UpdateAuctionRequest request, bool isAdmin = false)
         {
-            var auction = await _unitOfWork.Auctions.Query()
+            var query = _unitOfWork.Auctions.Query()
                 .Include(a => a.Seller)
                 .Include(a => a.Category)
-                .Include(a => a.Bids)
-                .FirstOrDefaultAsync(a => a.Id == id && a.SellerId == userId);
+                .Include(a => a.Bids);
+
+            var auction = isAdmin
+                ? await query.FirstOrDefaultAsync(a => a.Id == id)
+                : await query.FirstOrDefaultAsync(a => a.Id == id && a.SellerId == userId);
 
             if (auction == null) return null;
 
-            // Allow editing until the first bid is placed
+            // If bids have already been placed, allow updating cosmetic/informational details (Description, ImageUrl),
+            // while preserving financial terms and deadlines to protect bidders.
             if (auction.Bids.Any())
-                throw new AuctionOx.Exceptions.BusinessRuleException("Auction cannot be updated after bids have been placed.");
+            {
+                auction.Description = request.Description;
+                auction.ImageUrl = request.ImageUrl;
 
-            // Validate updated times
+                _unitOfWork.Auctions.Update(auction);
+                await _unitOfWork.CompleteAsync();
+                
+                return _mapper.Map<AuctionItemDto>(auction);
+            }
+
+            // If no bids placed yet, validate updated times and terms
             if (request.StartTime >= request.EndTime)
                 throw new AuctionOx.Exceptions.BusinessRuleException("Start time must be before end time.");
 
@@ -194,6 +206,19 @@ namespace AuctionOx.Services.Implementations
             await _unitOfWork.CompleteAsync();
             
             _logger.LogInformation("Auction {AuctionId} was suspended by an Administrator.", id);
+            return true;
+        }
+
+        public async Task<bool> ResumeAuctionAsync(int id)
+        {
+            var auction = await _unitOfWork.Auctions.Query().FirstOrDefaultAsync(a => a.Id == id);
+            if (auction == null) return false;
+
+            auction.Status = ItemStatus.Active;
+            _unitOfWork.Auctions.Update(auction);
+            await _unitOfWork.CompleteAsync();
+            
+            _logger.LogInformation("Auction {AuctionId} was resumed by an Administrator.", id);
             return true;
         }
 
