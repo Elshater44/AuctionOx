@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react'
 
 const ToastContext = createContext(null)
@@ -14,7 +14,16 @@ export function ToastProvider({ children }) {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5)
     const newToast = { id, title, description, variant }
 
-    setToasts((prev) => [...prev, newToast])
+    setToasts((prev) => {
+      // Deduplicate: Don't show duplicate toast if already visible
+      const isDuplicate = prev.some(
+        (t) => t.title === title && t.description === description && t.variant === variant
+      )
+      if (isDuplicate) return prev
+
+      // Keep at most 3 simultaneous toasts to prevent screen flooding
+      return [...prev.slice(-2), newToast]
+    })
 
     if (duration > 0) {
       setTimeout(() => {
@@ -25,13 +34,13 @@ export function ToastProvider({ children }) {
     return id
   }, [removeToast])
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (title, description) => addToast({ title, description, variant: 'success' }),
     error: (title, description) => addToast({ title, description, variant: 'error' }),
     warning: (title, description) => addToast({ title, description, variant: 'warning' }),
     info: (title, description) => addToast({ title, description, variant: 'info' }),
     dismiss: removeToast,
-  }
+  }), [addToast, removeToast])
 
   return (
     <ToastContext.Provider value={toast}>

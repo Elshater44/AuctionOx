@@ -52,7 +52,11 @@ export function MyActivityPage({ onSelectAuction, onNavigateCreate, onNavigateHo
       setBids(data || [])
     } catch (err) {
       console.error('Failed to load user bids:', err)
-      toast.error('Failed to load bids', 'Please check your connection and try again.')
+      const isNetworkError = !err.response || err.code === 'ERR_NETWORK'
+      toast.error(
+        isNetworkError ? 'Server Offline' : 'Failed to load bids',
+        isNetworkError ? 'Could not reach backend API. Please start the server.' : 'Please try again later.'
+      )
     } finally {
       setIsLoadingBids(false)
     }
@@ -68,7 +72,11 @@ export function MyActivityPage({ onSelectAuction, onNavigateCreate, onNavigateHo
       setListingsPage(result?.pageNumber || page)
     } catch (err) {
       console.error('Failed to load user listings:', err)
-      toast.error('Failed to load listings', 'Please check your connection and try again.')
+      const isNetworkError = !err.response || err.code === 'ERR_NETWORK'
+      // If it's a network error, fetchBids already informed the user
+      if (!isNetworkError) {
+        toast.error('Failed to load listings', 'Please try again later.')
+      }
     } finally {
       setIsLoadingListings(false)
     }
