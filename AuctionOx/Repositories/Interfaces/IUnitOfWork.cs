@@ -9,6 +9,7 @@ namespace AuctionOx.Repositories.Interfaces
         IRepository<Category> Categories { get; }
         IRepository<AuctionItem> Auctions { get; }
         IRepository<Bid> Bids { get; }
+        IRepository<Notification> Notifications { get; }
 
         Task<int> CompleteAsync();
     }

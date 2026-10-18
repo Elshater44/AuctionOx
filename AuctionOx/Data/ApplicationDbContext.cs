@@ -18,6 +18,7 @@ namespace AuctionOx.Data
         public DbSet<Category> Categories { get; set; }
         public DbSet<AuctionItem> AuctionItems { get; set; }
         public DbSet<Bid> Bids { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -38,6 +39,23 @@ namespace AuctionOx.Data
                 .HasOne(b => b.AuctionItem)
                 .WithMany(a => a.Bids)
                 .HasForeignKey(b => b.AuctionItemId);
+
+            builder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId);
+
+            builder.Entity<Notification>()
+                .HasOne(n => n.AuctionItem)
+                .WithMany()
+                .HasForeignKey(n => n.AuctionItemId)
+                .IsRequired(false);
+
+            builder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.IsRead });
+
+            builder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.CreatedAt });
 
             // Configure Decimals
             builder.Entity<AuctionItem>()
@@ -61,6 +79,7 @@ namespace AuctionOx.Data
             builder.Entity<Category>().HasQueryFilter(c => !c.IsDeleted);
             builder.Entity<AuctionItem>().HasQueryFilter(a => !a.IsDeleted);
             builder.Entity<Bid>().HasQueryFilter(b => !b.IsDeleted);
+            builder.Entity<Notification>().HasQueryFilter(n => !n.IsDeleted);
 
             // Disable Cascade Deletes globally
             var cascadeFKs = builder.Model.GetEntityTypes()

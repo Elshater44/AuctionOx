@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/context/AuthContext'
+import { NotificationDropdown } from '@/components/NotificationDropdown'
 import { Gavel, LogOut, User as UserIcon, Shield, LayoutDashboard, Store } from 'lucide-react'
 
 export function Navbar({ 
@@ -104,6 +105,9 @@ export function Navbar({
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 Activity
               </Button>
+
+              {/* Notifications Dropdown */}
+              <NotificationDropdown />
 
               <div 
                 onClick={handleActivity}

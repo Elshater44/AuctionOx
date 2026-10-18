@@ -13,6 +13,7 @@ namespace AuctionOx.Repositories.Implementations
         public IRepository<Category> Categories { get; private set; }
         public IRepository<AuctionItem> Auctions { get; private set; }
         public IRepository<Bid> Bids { get; private set; }
+        public IRepository<Notification> Notifications { get; private set; }
 
         public UnitOfWork(ApplicationDbContext context)
         {
@@ -20,6 +21,7 @@ namespace AuctionOx.Repositories.Implementations
             Categories = new Repository<Category>(_context);
             Auctions = new Repository<AuctionItem>(_context);
             Bids = new Repository<Bid>(_context);
+            Notifications = new Repository<Notification>(_context);
         }
 
         public async Task<int> CompleteAsync()

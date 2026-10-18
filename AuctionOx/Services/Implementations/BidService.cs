@@ -14,13 +14,20 @@ namespace AuctionOx.Services.Implementations
         private readonly IMapper _mapper;
         private readonly Microsoft.Extensions.Logging.ILogger<BidService> _logger;
         private readonly IHubContext<BiddingHub, IBiddingClient> _biddingHubContext;
+        private readonly Interfaces.INotificationService? _notificationService;
 
-        public BidService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper, Microsoft.Extensions.Logging.ILogger<BidService> logger, IHubContext<BiddingHub, IBiddingClient> biddingHubContext)
+        public BidService(
+            AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork,
+            IMapper mapper,
+            Microsoft.Extensions.Logging.ILogger<BidService> logger,
+            IHubContext<BiddingHub, IBiddingClient> biddingHubContext,
+            Interfaces.INotificationService? notificationService = null)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _logger = logger;
             _biddingHubContext = biddingHubContext;
+            _notificationService = notificationService;
         }
 
         public async Task<List<BidDto>> GetBidsForAuctionAsync(int auctionId)
@@ -71,6 +78,9 @@ namespace AuctionOx.Services.Implementations
                             request.BidAmount = auction.BuyItNowPrice!.Value;
                         }
 
+                        var previousWinningBid = auction.Bids?.OrderByDescending(b => b.BidAmount).FirstOrDefault(b => b.IsWinningBid) 
+                            ?? auction.Bids?.OrderByDescending(b => b.BidAmount).FirstOrDefault();
+
                         var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
 
                         await _unitOfWork.Bids.AddAsync(bid);
@@ -84,6 +94,57 @@ namespace AuctionOx.Services.Implementations
                         _logger.LogInformation("Bid of {Amount} successfully placed on auction {AuctionId} by user {UserId}.", bid.BidAmount, auctionId, userId);
                         var liveBiddingData = await GetBidsForAuctionAsync(auctionId);
                         await _biddingHubContext.Clients.Group(auctionId.ToString()).ReceiveLiveBidData(liveBiddingData);
+
+                        if (_notificationService != null)
+                        {
+                            try
+                            {
+                                // Alert prior highest bidder that they've been outbid
+                                if (previousWinningBid != null && previousWinningBid.BidderId != userId)
+                                {
+                                    await _notificationService.CreateAndSendNotificationAsync(
+                                        previousWinningBid.BidderId,
+                                        "Outbid Alert!",
+                                        $"You have been outbid on \"{auction.Title}\". New highest bid is {bid.BidAmount:C}.",
+                                        NotificationType.Outbid,
+                                        auction.Id);
+                                }
+
+                                // Alert seller
+                                if (auction.SellerId != userId)
+                                {
+                                    if (isBuyItNow)
+                                    {
+                                        await _notificationService.CreateAndSendNotificationAsync(
+                                            auction.SellerId,
+                                            "Item Sold!",
+                                            $"Your auction \"{auction.Title}\" was purchased via Buy It Now for {bid.BidAmount:C}.",
+                                            NotificationType.AuctionEnded,
+                                            auction.Id);
+
+                                        await _notificationService.CreateAndSendNotificationAsync(
+                                            userId,
+                                            "Congratulations! Item Won!",
+                                            $"You purchased \"{auction.Title}\" for {bid.BidAmount:C} via Buy It Now.",
+                                            NotificationType.AuctionWon,
+                                            auction.Id);
+                                    }
+                                    else
+                                    {
+                                        await _notificationService.CreateAndSendNotificationAsync(
+                                            auction.SellerId,
+                                            "New Bid Received!",
+                                            $"A new bid of {bid.BidAmount:C} was placed on your auction \"{auction.Title}\".",
+                                            NotificationType.NewBid,
+                                            auction.Id);
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Failed to send notification for bid placed on auction {AuctionId}", auctionId);
+                            }
+                        }
 
                         return _mapper.Map<BidDto>(bidWithNav ?? bid);
                     }

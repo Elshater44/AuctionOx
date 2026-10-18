@@ -83,6 +83,7 @@ builder.Services.AddScoped<AuctionOx.Services.Interfaces.IAuthService, AuctionOx
 builder.Services.AddScoped<AuctionOx.Services.Interfaces.ICategoryService, AuctionOx.Services.Implementations.CategoryService>();
 builder.Services.AddScoped<AuctionOx.Services.Interfaces.IAuctionService, AuctionOx.Services.Implementations.AuctionService>();
 builder.Services.AddScoped<AuctionOx.Services.Interfaces.IBidService, AuctionOx.Services.Implementations.BidService>();
+builder.Services.AddScoped<AuctionOx.Services.Interfaces.INotificationService, AuctionOx.Services.Implementations.NotificationService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -249,6 +250,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 app.MapHub<BiddingHub>("/hubs/bidding");
+app.MapHub<NotificationHub>("/hubs/notifications");
 app.Run();
 
 public partial class Program { }

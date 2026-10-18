@@ -17,12 +17,18 @@ namespace AuctionOx.Services.Implementations
         private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly Microsoft.Extensions.Logging.ILogger<AuctionService> _logger;
+        private readonly Interfaces.INotificationService? _notificationService;
 
-        public AuctionService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper, Microsoft.Extensions.Logging.ILogger<AuctionService> logger)
+        public AuctionService(
+            AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork,
+            IMapper mapper,
+            Microsoft.Extensions.Logging.ILogger<AuctionService> logger,
+            Interfaces.INotificationService? notificationService = null)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
         public async Task<PagedResult<AuctionItemDto>> GetAuctionsAsync(int? categoryId, string? status, string? search, string? sortBy, int pageNumber, int pageSize)
@@ -280,6 +286,32 @@ namespace AuctionOx.Services.Implementations
                     await _unitOfWork.Bids.AddAsync(bid);
                     _unitOfWork.Auctions.Update(auction);
                     await _unitOfWork.CompleteAsync();
+
+                    if (_notificationService != null)
+                    {
+                        try
+                        {
+                            // Notify buyer
+                            await _notificationService.CreateAndSendNotificationAsync(
+                                userId,
+                                "Congratulations! Item Won!",
+                                $"You purchased \"{auction.Title}\" for {bid.BidAmount:C} via Buy It Now.",
+                                NotificationType.AuctionWon,
+                                auction.Id);
+
+                            // Notify seller
+                            await _notificationService.CreateAndSendNotificationAsync(
+                                auction.SellerId,
+                                "Item Sold!",
+                                $"Your auction \"{auction.Title}\" was purchased via Buy It Now for {bid.BidAmount:C}.",
+                                NotificationType.AuctionEnded,
+                                auction.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to send notifications for Buy It Now on auction {AuctionId}", auction.Id);
+                        }
+                    }
 
                     return true;
                 }

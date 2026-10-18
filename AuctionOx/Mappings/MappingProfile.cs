@@ -54,6 +54,9 @@ namespace AuctionOx.Mappings
                 .ForMember(dest => dest.CurrentPrice, opt => opt.MapFrom(src => src.StartingPrice));
 
             CreateMap<UpdateAuctionRequest, AuctionItem>();
+
+            // Notification Mappings
+            CreateMap<Notification, AuctionOx.DTOs.Notifications.NotificationDto>();
         }
     }
 }
