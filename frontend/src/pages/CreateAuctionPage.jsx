@@ -64,6 +64,22 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Pre-flight validation: size limit (5 MB)
+    const maxSizeBytes = 5 * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      setError(`Image size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the maximum limit of 5 MB.`)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    // Pre-flight validation: allowed formats
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setError('Invalid file type. Only JPEG, PNG, and WebP images are allowed.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
     try {
       setIsUploading(true)
       setError(null)
@@ -236,6 +252,10 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
                   )}
                 </Button>
               </div>
+
+              <p className="text-[11px] text-slate-400">
+                Max file size: <span className="font-medium text-slate-600">5 MB</span> • Formats: <span className="font-medium text-slate-600">JPEG, PNG, WebP</span>
+              </p>
 
               {/* LIVE PREVIEW CONTAINER */}
               <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 overflow-hidden">

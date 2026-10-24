@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
-  Layers
+  Layers,
+  Upload,
+  Loader2
 } from 'lucide-react'
 
 export function EditAuctionModal({ isOpen, onClose, auction, onSuccess }) {
@@ -29,9 +31,44 @@ export function EditAuctionModal({ isOpen, onClose, auction, onSuccess }) {
   
   // Image preview state
   const [imageStatus, setImageStatus] = useState('idle') // 'idle' | 'loading' | 'loaded' | 'error'
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = React.useRef(null)
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Pre-flight validation: size limit (5 MB)
+    const maxSizeBytes = 5 * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      setError(`Image size (${(file.size / (1024 * 1024)).toFixed(1)} MB) exceeds the maximum limit of 5 MB.`)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    // Pre-flight validation: allowed formats
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setError('Invalid file type. Only JPEG, PNG, and WebP images are allowed.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    try {
+      setIsUploading(true)
+      setError(null)
+      const data = await auctionApi.uploadImage(file)
+      setImageUrl(data.url)
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   // Determine if bids exist
   const hasBids = (auction?.bidCount > 0) || (auction?.recentBids?.length > 0)
@@ -250,13 +287,46 @@ export function EditAuctionModal({ isOpen, onClose, auction, onSuccess }) {
               )}
             </div>
 
-            <Input
-              type="url"
-              placeholder="https://images.unsplash.com/photo-..."
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="text-xs"
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
             />
+
+            <div className="flex gap-2">
+              <Input
+                type="url"
+                placeholder="Paste URL or upload a file..."
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                className="flex-1 text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="shrink-0 flex items-center gap-1.5 border-slate-300 hover:bg-slate-100 text-xs h-9 px-3"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Upload</span>
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <p className="text-[10px] text-slate-400">
+              Max file size: <span className="font-medium text-slate-600">5 MB</span> • Formats: <span className="font-medium text-slate-600">JPEG, PNG, WebP</span>
+            </p>
 
             {/* LIVE IMAGE PREVIEW BOX */}
             <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 overflow-hidden">

@@ -121,10 +121,10 @@ namespace AuctionOx.Tests.Controllers
         }
 
         [Fact]
-        public async Task UploadImage_WhenFileExceeds10MB_ReturnsBadRequest()
+        public async Task UploadImage_WhenFileExceeds5MB_ReturnsBadRequest()
         {
             var largeFile = new Mock<IFormFile>();
-            largeFile.Setup(f => f.Length).Returns(11 * 1024 * 1024); // 11MB
+            largeFile.Setup(f => f.Length).Returns(6 * 1024 * 1024); // 6MB
 
             var result = await _controller.UploadImage(largeFile.Object);
 
@@ -145,11 +145,29 @@ namespace AuctionOx.Tests.Controllers
         }
 
         [Fact]
-        public async Task UploadImage_WhenValid_UploadsAndReturnsFileIdAndUrl()
+        public async Task UploadImage_WhenSpoofedMagicBytes_ReturnsBadRequest()
         {
-            var stream = new MemoryStream(Encoding.UTF8.GetBytes("image-content"));
+            // Named .jpg but containing plain text instead of JPEG headers
+            var stream = new MemoryStream(Encoding.UTF8.GetBytes("THIS_IS_NOT_A_REAL_IMAGE"));
+            var spoofedFile = new Mock<IFormFile>();
+            spoofedFile.Setup(f => f.Length).Returns(1024);
+            spoofedFile.Setup(f => f.ContentType).Returns("image/jpeg");
+            spoofedFile.Setup(f => f.FileName).Returns("fake.jpg");
+            spoofedFile.Setup(f => f.OpenReadStream()).Returns(stream);
+
+            var result = await _controller.UploadImage(spoofedFile.Object);
+
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UploadImage_WhenValidJpeg_UploadsAndReturnsFileIdAndUrl()
+        {
+            // Valid JPEG magic header: FF D8 FF E0
+            var jpegBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01 };
+            var stream = new MemoryStream(jpegBytes);
             var validFile = new Mock<IFormFile>();
-            validFile.Setup(f => f.Length).Returns(1024);
+            validFile.Setup(f => f.Length).Returns(jpegBytes.Length);
             validFile.Setup(f => f.ContentType).Returns("image/jpeg");
             validFile.Setup(f => f.FileName).Returns("photo.jpg");
             validFile.Setup(f => f.OpenReadStream()).Returns(stream);
@@ -157,6 +175,28 @@ namespace AuctionOx.Tests.Controllers
             _mockStorageService
                 .Setup(s => s.UploadImageAsync(It.IsAny<Stream>(), "photo.jpg", "image/jpeg"))
                 .ReturnsAsync("tg_file_id_999");
+
+            var result = await _controller.UploadImage(validFile.Object);
+
+            var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+            okResult.Value.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task UploadImage_WhenValidPng_UploadsAndReturnsFileIdAndUrl()
+        {
+            // Valid PNG magic header: 89 50 4E 47 0D 0A 1A 0A
+            var pngBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D };
+            var stream = new MemoryStream(pngBytes);
+            var validFile = new Mock<IFormFile>();
+            validFile.Setup(f => f.Length).Returns(pngBytes.Length);
+            validFile.Setup(f => f.ContentType).Returns("image/png");
+            validFile.Setup(f => f.FileName).Returns("graphic.png");
+            validFile.Setup(f => f.OpenReadStream()).Returns(stream);
+
+            _mockStorageService
+                .Setup(s => s.UploadImageAsync(It.IsAny<Stream>(), "graphic.png", "image/png"))
+                .ReturnsAsync("tg_file_id_png");
 
             var result = await _controller.UploadImage(validFile.Object);
 
