@@ -70,7 +70,7 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
       const data = await auctionApi.uploadImage(file)
       setImageUrl(data.url)
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload image.')
+      setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to upload image.')
     } finally {
       setIsUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

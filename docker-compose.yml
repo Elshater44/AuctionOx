@@ -37,6 +37,8 @@ services:
       - JwtSettings__Secret=SuperSecretDevKeyForAuctionOxProjectAtLeast32BytesLong!
       - JwtSettings__Issuer=AuctionOx
       - JwtSettings__Audience=AuctionOx
+      - TelegramStorage__BotToken=8804867141:AAGBB3wE_P50JDJPHn6b6PBBBcYvQKAyl30
+      - TelegramStorage__ChannelId=-1004486257657
     ports:
       - "5050:8080"
     depends_on:
