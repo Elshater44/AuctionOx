@@ -1,24 +1,29 @@
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using AuctionOx.DTOs.Auth;
+using AuctionOx.Exceptions;
 using AuctionOx.Models;
+using AuctionOx.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AuctionOx.Services.Implementations
 {
-    public class AuthService : Interfaces.IAuthService
+    public class AuthService : IAuthService
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _config;
-        private readonly Microsoft.Extensions.Logging.ILogger<AuthService> _logger;
+        private readonly ILogger<AuthService> _logger;
 
-        public AuthService(UserManager<ApplicationUser> userManager, IConfiguration config, Microsoft.Extensions.Logging.ILogger<AuthService> logger)
+        public AuthService(UserManager<ApplicationUser> userManager, IConfiguration config, ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _config = config;
@@ -39,7 +44,7 @@ namespace AuctionOx.Services.Implementations
             if (!result.Succeeded)
             {
                 _logger.LogWarning("Failed registration attempt for email {Email}. Errors: {Errors}", request.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
-                throw new AuctionOx.Exceptions.BusinessRuleException(string.Join(", ", result.Errors.Select(e => e.Description)));
+                throw new BusinessRuleException(string.Join(", ", result.Errors.Select(e => e.Description)));
             }
 
             await _userManager.AddToRoleAsync(user, "User");
@@ -54,7 +59,7 @@ namespace AuctionOx.Services.Implementations
             if (user == null || !await _userManager.CheckPasswordAsync(user, request.Password))
             {
                 _logger.LogWarning("Failed login attempt for email {Email}.", request.Email);
-                throw new AuctionOx.Exceptions.BusinessRuleException("Invalid credentials");
+                throw new BusinessRuleException("Invalid credentials");
             }
 
             _logger.LogInformation("User {Email} logged in successfully.", request.Email);
@@ -94,14 +99,14 @@ namespace AuctionOx.Services.Implementations
             var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out SecurityToken securityToken);
             if (securityToken is not JwtSecurityToken jwtSecurityToken || !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
             {
-                throw new AuctionOx.Exceptions.BusinessRuleException("Invalid token");
+                throw new BusinessRuleException("Invalid token");
             }
 
             var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _userManager.FindByIdAsync(userId!);
             if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
             {
-                throw new AuctionOx.Exceptions.BusinessRuleException("Invalid refresh token");
+                throw new BusinessRuleException("Invalid refresh token");
             }
 
             return await GenerateTokenAsync(user);
@@ -136,7 +141,7 @@ namespace AuctionOx.Services.Implementations
                 signingCredentials: creds
             );
 
-            var refreshToken = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(64));
+            var refreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7); // 7 days valid

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using AuctionOx.Models;
 using AuctionOx.Repositories.Interfaces;
+using AuctionOx.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -48,7 +49,7 @@ namespace AuctionOx.BackgroundServices
         {
             using var scope = _serviceProvider.CreateScope();
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-            var notificationService = scope.ServiceProvider.GetService<AuctionOx.Services.Interfaces.INotificationService>();
+            var notificationService = scope.ServiceProvider.GetService<INotificationService>();
 
             var now = DateTime.UtcNow;
 

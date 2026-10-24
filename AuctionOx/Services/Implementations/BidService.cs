@@ -1,27 +1,39 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using AuctionOx.DTOs.Bids;
+using AuctionOx.Exceptions;
+using AuctionOx.Helpers;
 using AuctionOx.Hubs;
 using AuctionOx.Hubs.Clients;
 using AuctionOx.Models;
+using AuctionOx.Repositories.Implementations;
+using AuctionOx.Repositories.Interfaces;
+using AuctionOx.Services.Interfaces;
 using AutoMapper;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AuctionOx.Services.Implementations
 {
-    public class BidService : Interfaces.IBidService
+    public class BidService : IBidService
     {
-        private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly Microsoft.Extensions.Logging.ILogger<BidService> _logger;
+        private readonly ILogger<BidService> _logger;
         private readonly IHubContext<BiddingHub, IBiddingClient> _biddingHubContext;
-        private readonly Interfaces.INotificationService? _notificationService;
+        private readonly INotificationService? _notificationService;
 
         public BidService(
-            AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork,
+            IUnitOfWork unitOfWork,
             IMapper mapper,
-            Microsoft.Extensions.Logging.ILogger<BidService> logger,
+            ILogger<BidService> logger,
             IHubContext<BiddingHub, IBiddingClient> biddingHubContext,
-            Interfaces.INotificationService? notificationService = null)
+            INotificationService? notificationService = null)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -41,11 +53,11 @@ namespace AuctionOx.Services.Implementations
             return _mapper.Map<List<BidDto>>(bids);
         }
 
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, System.Threading.SemaphoreSlim> _auctionLocks = new();
+        private static readonly ConcurrentDictionary<int, SemaphoreSlim> _auctionLocks = new();
 
         public async Task<BidDto> PlaceBidAsync(int auctionId, string userId, PlaceBidRequest request)
         {
-            var semaphore = _auctionLocks.GetOrAdd(auctionId, _ => new System.Threading.SemaphoreSlim(1, 1));
+            var semaphore = _auctionLocks.GetOrAdd(auctionId, _ => new SemaphoreSlim(1, 1));
             await semaphore.WaitAsync();
             try
             {
@@ -58,19 +70,19 @@ namespace AuctionOx.Services.Implementations
                             .Include(a => a.Bids)
                             .FirstOrDefaultAsync(a => a.Id == auctionId);
 
-                        if (auction == null) throw new AuctionOx.Exceptions.BusinessRuleException("Auction not found.");
+                        if (auction == null) throw new BusinessRuleException("Auction not found.");
 
-                        if (auction.Status != ItemStatus.Active) throw new AuctionOx.Exceptions.BusinessRuleException("Auction is not active.");
+                        if (auction.Status != ItemStatus.Active) throw new BusinessRuleException("Auction is not active.");
 
-                        if (auction.SellerId == userId) throw new AuctionOx.Exceptions.BusinessRuleException("Sellers cannot bid on their own auctions.");
+                        if (auction.SellerId == userId) throw new BusinessRuleException("Sellers cannot bid on their own auctions.");
 
                         // Auction must have started
-                        if (DateTime.UtcNow < auction.StartTime) throw new AuctionOx.Exceptions.BusinessRuleException("This auction has not started yet.");
+                        if (DateTime.UtcNow < auction.StartTime) throw new BusinessRuleException("This auction has not started yet.");
 
-                        if (DateTime.UtcNow > auction.EndTime) throw new AuctionOx.Exceptions.BusinessRuleException("Auction has already ended.");
+                        if (DateTime.UtcNow > auction.EndTime) throw new BusinessRuleException("Auction has already ended.");
 
                         if (request.BidAmount <= auction.CurrentPrice)
-                            throw new AuctionOx.Exceptions.BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
+                            throw new BusinessRuleException($"Bid must be higher than the current price of {auction.CurrentPrice:C}.");
 
                         bool isBuyItNow = auction.BuyItNowPrice.HasValue && request.BidAmount >= auction.BuyItNowPrice.Value;
                         if (isBuyItNow)
@@ -81,7 +93,7 @@ namespace AuctionOx.Services.Implementations
                         var previousWinningBid = auction.Bids?.OrderByDescending(b => b.BidAmount).FirstOrDefault(b => b.IsWinningBid) 
                             ?? auction.Bids?.OrderByDescending(b => b.BidAmount).FirstOrDefault();
 
-                        var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
+                        var bid = AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(auction, userId, request.BidAmount, isBuyItNow);
 
                         await _unitOfWork.Bids.AddAsync(bid);
                         _unitOfWork.Auctions.Update(auction);
@@ -152,16 +164,16 @@ namespace AuctionOx.Services.Implementations
                     {
                         if (retryCount == maxRetries - 1)
                         {
-                            throw new AuctionOx.Exceptions.BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
+                            throw new BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
                         }
-                        if (_unitOfWork is AuctionOx.Repositories.Implementations.UnitOfWork uow && uow.Context != null)
+                        if (_unitOfWork is UnitOfWork uow && uow.Context != null)
                         {
                             uow.Context.ChangeTracker.Clear();
                         }
                     }
                 }
 
-                throw new AuctionOx.Exceptions.BusinessRuleException("Failed to place bid after multiple attempts.");
+                throw new BusinessRuleException("Failed to place bid after multiple attempts.");
             }
             finally
             {

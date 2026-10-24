@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using AuctionOx.Data;
+using AuctionOx.Models;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -31,7 +32,7 @@ namespace AuctionOx.Tests.Integration
 
             if (!await context.Categories.AnyAsync())
             {
-                context.Categories.Add(new AuctionOx.Models.Category
+                context.Categories.Add(new Category
                 {
                     Name = "General",
                     Description = "General test category"

@@ -3,6 +3,7 @@ using AuctionOx.DTOs.Auctions;
 using AuctionOx.DTOs.Auth;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.DTOs.Categories;
+using AuctionOx.DTOs.Notifications;
 using AuctionOx.Models;
 
 namespace AuctionOx.Mappings
@@ -56,7 +57,7 @@ namespace AuctionOx.Mappings
             CreateMap<UpdateAuctionRequest, AuctionItem>();
 
             // Notification Mappings
-            CreateMap<Notification, AuctionOx.DTOs.Notifications.NotificationDto>();
+            CreateMap<Notification, NotificationDto>();
         }
     }
 }

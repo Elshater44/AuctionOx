@@ -4,17 +4,19 @@ using System.Threading.Tasks;
 using AuctionOx.Data;
 using AuctionOx.DTOs.Categories;
 using AuctionOx.Models;
+using AuctionOx.Repositories.Interfaces;
+using AuctionOx.Services.Interfaces;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuctionOx.Services.Implementations
 {
-    public class CategoryService : Interfaces.ICategoryService
+    public class CategoryService : ICategoryService
     {
-        private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
 
-        public CategoryService(AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork, IMapper mapper)
+        public CategoryService(IUnitOfWork unitOfWork, IMapper mapper)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;

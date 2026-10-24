@@ -1,6 +1,17 @@
+using System.Security.Claims;
+using System.Text;
+using System.Threading.RateLimiting;
+using AuctionOx.BackgroundServices;
 using AuctionOx.Data;
 using AuctionOx.Hubs;
+using AuctionOx.Infrastructure;
+using AuctionOx.Mappings;
 using AuctionOx.Models;
+using AuctionOx.Repositories.Implementations;
+using AuctionOx.Repositories.Interfaces;
+using AuctionOx.Services.Implementations;
+using AuctionOx.Services.Interfaces;
+using AuctionOx.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,15 +19,13 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Claims;
-using System.Text;
-using System.Threading.RateLimiting;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Global Exception Handling (Problem Details)
 builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler<AuctionOx.Infrastructure.GlobalExceptionHandler>();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // Add CORS Policy
 builder.Services.AddCors(options =>
@@ -74,16 +83,17 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 // Register Services
-builder.Services.AddAutoMapper(cfg => cfg.AddProfile<AuctionOx.Mappings.MappingProfile>());
+builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
-builder.Services.AddScoped(typeof(AuctionOx.Repositories.Interfaces.IRepository<>), typeof(AuctionOx.Repositories.Implementations.Repository<>));
-builder.Services.AddScoped<AuctionOx.Repositories.Interfaces.IUnitOfWork, AuctionOx.Repositories.Implementations.UnitOfWork>();
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-builder.Services.AddScoped<AuctionOx.Services.Interfaces.IAuthService, AuctionOx.Services.Implementations.AuthService>();
-builder.Services.AddScoped<AuctionOx.Services.Interfaces.ICategoryService, AuctionOx.Services.Implementations.CategoryService>();
-builder.Services.AddScoped<AuctionOx.Services.Interfaces.IAuctionService, AuctionOx.Services.Implementations.AuctionService>();
-builder.Services.AddScoped<AuctionOx.Services.Interfaces.IBidService, AuctionOx.Services.Implementations.BidService>();
-builder.Services.AddScoped<AuctionOx.Services.Interfaces.INotificationService, AuctionOx.Services.Implementations.NotificationService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IAuctionService, AuctionService>();
+builder.Services.AddScoped<IBidService, BidService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddHttpClient<IImageStorageService, TelegramImageStorageService>();
 
 // Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -173,10 +183,10 @@ builder.Services.AddControllers();
 
 // Register FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddValidatorsFromAssemblyContaining<AuctionOx.Validators.CreateAuctionRequestValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateAuctionRequestValidator>();
 
 // Register Background Services
-builder.Services.AddHostedService<AuctionOx.BackgroundServices.AuctionCloserService>();
+builder.Services.AddHostedService<AuctionCloserService>();
 
 builder.Services.AddSignalR();
 
@@ -185,24 +195,24 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Simply paste your token here without any prefix.",
         Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
 
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            new OpenApiSecurityScheme
             {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                Reference = new OpenApiReference
                 {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
                 }
             },

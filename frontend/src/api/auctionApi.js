@@ -19,6 +19,18 @@ export const auctionApi = {
     return response.data // AuctionDetailDto
   },
 
+  // POST /api/images/upload (Protected, multipart/form-data)
+  uploadImage: async (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await axiosClient.post('/images/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data // { fileId, url }
+  },
+
   // POST /api/auctions (Protected)
   createAuction: async (auctionData) => {
     const response = await axiosClient.post('/auctions', auctionData)

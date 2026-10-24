@@ -11,7 +11,9 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   AlertTriangle,
-  Layers
+  Layers,
+  Upload,
+  Loader2
 } from 'lucide-react'
 
 export function CreateAuctionPage({ onBack, onSuccess }) {
@@ -27,6 +29,8 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
   const [durationHours, setDurationHours] = useState(24)
   const [categoryId, setCategoryId] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = React.useRef(null)
   const [antiSnipingMinutes, setAntiSnipingMinutes] = useState(5)
   const [imageStatus, setImageStatus] = useState('idle') // 'idle' | 'loading' | 'loaded' | 'error'
   const [error, setError] = useState(null)
@@ -55,6 +59,23 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
       setImageStatus('loading')
     }
   }, [imageUrl])
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setIsUploading(true)
+      setError(null)
+      const data = await auctionApi.uploadImage(file)
+      setImageUrl(data.url)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -178,12 +199,43 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
                 )}
               </div>
 
-              <Input
-                type="url"
-                placeholder="https://images.unsplash.com/photo-..."
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
+              {/* Upload or URL Row */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
               />
+
+              <div className="flex gap-2">
+                <Input
+                  type="url"
+                  placeholder="Paste URL or click upload to store image..."
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="shrink-0 flex items-center gap-1.5 border-slate-300 hover:bg-slate-100"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                      <span className="text-xs">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-xs">Upload Image</span>
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {/* LIVE PREVIEW CONTAINER */}
               <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 overflow-hidden">

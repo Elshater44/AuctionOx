@@ -6,24 +6,30 @@ using AuctionOx.Data;
 using AuctionOx.DTOs.Auctions;
 using AuctionOx.DTOs.Bids;
 using AuctionOx.DTOs.Common;
+using AuctionOx.Exceptions;
+using AuctionOx.Helpers;
 using AuctionOx.Models;
+using AuctionOx.Repositories.Implementations;
+using AuctionOx.Repositories.Interfaces;
+using AuctionOx.Services.Interfaces;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace AuctionOx.Services.Implementations
 {
-    public class AuctionService : Interfaces.IAuctionService
+    public class AuctionService : IAuctionService
     {
-        private readonly AuctionOx.Repositories.Interfaces.IUnitOfWork _unitOfWork;
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly Microsoft.Extensions.Logging.ILogger<AuctionService> _logger;
-        private readonly Interfaces.INotificationService? _notificationService;
+        private readonly ILogger<AuctionService> _logger;
+        private readonly INotificationService? _notificationService;
 
         public AuctionService(
-            AuctionOx.Repositories.Interfaces.IUnitOfWork unitOfWork,
+            IUnitOfWork unitOfWork,
             IMapper mapper,
-            Microsoft.Extensions.Logging.ILogger<AuctionService> logger,
-            Interfaces.INotificationService? notificationService = null)
+            ILogger<AuctionService> logger,
+            INotificationService? notificationService = null)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -98,18 +104,18 @@ namespace AuctionOx.Services.Implementations
         {
             // --- Input Validation ---
             if (request.StartTime >= request.EndTime)
-                throw new AuctionOx.Exceptions.BusinessRuleException("Start time must be before end time.");
+                throw new BusinessRuleException("Start time must be before end time.");
 
             if (request.BuyItNowPrice.HasValue && request.BuyItNowPrice.Value <= request.StartingPrice)
-                throw new AuctionOx.Exceptions.BusinessRuleException("Buy It Now price must be greater than the starting price.");
+                throw new BusinessRuleException("Buy It Now price must be greater than the starting price.");
 
             if (request.AntiSnipingMinutes < 0)
-                throw new AuctionOx.Exceptions.BusinessRuleException("Anti-sniping minutes cannot be negative.");
+                throw new BusinessRuleException("Anti-sniping minutes cannot be negative.");
 
             var categoryExists = await _unitOfWork.Categories.Query()
                 .AnyAsync(c => c.Id == request.CategoryId);
             if (!categoryExists)
-                throw new AuctionOx.Exceptions.BusinessRuleException("The specified category does not exist.");
+                throw new BusinessRuleException("The specified category does not exist.");
 
             var auction = _mapper.Map<AuctionItem>(request);
             auction.SellerId = userId;
@@ -118,13 +124,13 @@ namespace AuctionOx.Services.Implementations
             await _unitOfWork.Auctions.AddAsync(auction);
             await _unitOfWork.CompleteAsync();
 
-            // Load nav props for DTO mapping
-            var auctionWithNav = await _unitOfWork.Auctions.Query()
+            var createdAuction = await _unitOfWork.Auctions.Query()
                 .Include(a => a.Seller)
                 .Include(a => a.Category)
+                .Include(a => a.Bids)
                 .FirstOrDefaultAsync(a => a.Id == auction.Id);
 
-            return _mapper.Map<AuctionItemDto>(auctionWithNav);
+            return _mapper.Map<AuctionItemDto>(createdAuction);
         }
 
         public async Task<AuctionItemDto?> UpdateAuctionAsync(int id, string userId, UpdateAuctionRequest request, bool isAdmin = false)
@@ -155,17 +161,17 @@ namespace AuctionOx.Services.Implementations
 
             // If no bids placed yet, validate updated times and terms
             if (request.StartTime >= request.EndTime)
-                throw new AuctionOx.Exceptions.BusinessRuleException("Start time must be before end time.");
+                throw new BusinessRuleException("Start time must be before end time.");
 
             if (request.BuyItNowPrice.HasValue && request.BuyItNowPrice.Value <= auction.StartingPrice)
-                throw new AuctionOx.Exceptions.BusinessRuleException("Buy It Now price must be greater than the starting price.");
+                throw new BusinessRuleException("Buy It Now price must be greater than the starting price.");
 
             if (request.CategoryId != auction.CategoryId)
             {
                 var categoryExists = await _unitOfWork.Categories.Query()
                     .AnyAsync(c => c.Id == request.CategoryId);
                 if (!categoryExists)
-                    throw new AuctionOx.Exceptions.BusinessRuleException("The specified category does not exist.");
+                    throw new BusinessRuleException("The specified category does not exist.");
             }
 
             _mapper.Map(request, auction);
@@ -269,18 +275,18 @@ namespace AuctionOx.Services.Implementations
 
                     // Cannot buy an expired auction
                     if (DateTime.UtcNow > auction.EndTime)
-                        throw new AuctionOx.Exceptions.BusinessRuleException("This auction has already ended.");
+                        throw new BusinessRuleException("This auction has already ended.");
 
                     // Cannot buy if competitive bids have already exceeded the buy-it-now price
                     if (auction.CurrentPrice >= auction.BuyItNowPrice.Value)
-                        throw new AuctionOx.Exceptions.BusinessRuleException("Current bid price already meets or exceeds the Buy It Now price.");
+                        throw new BusinessRuleException("Current bid price already meets or exceeds the Buy It Now price.");
 
                     if (auction.SellerId == userId)
-                        throw new AuctionOx.Exceptions.BusinessRuleException("You cannot buy your own auction.");
+                        throw new BusinessRuleException("You cannot buy your own auction.");
 
                     // Use the helper to create the winning bid and close the auction.
                     // This also handles unmarking previous winning bids if the auction had any.
-                    var bid = AuctionOx.Helpers.AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(
+                    var bid = AuctionBiddingHelper.CreateWinningBidAndCloseOrExtend(
                         auction, userId, auction.BuyItNowPrice.Value, isBuyItNow: true);
 
                     await _unitOfWork.Bids.AddAsync(bid);
@@ -319,9 +325,9 @@ namespace AuctionOx.Services.Implementations
                 {
                     if (retryCount == maxRetries - 1)
                     {
-                        throw new AuctionOx.Exceptions.BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
+                        throw new BusinessRuleException("The auction was updated by another user. Please refresh and try again.");
                     }
-                    if (_unitOfWork is AuctionOx.Repositories.Implementations.UnitOfWork uow && uow.Context != null)
+                    if (_unitOfWork is UnitOfWork uow && uow.Context != null)
                     {
                         uow.Context.ChangeTracker.Clear();
                     }
