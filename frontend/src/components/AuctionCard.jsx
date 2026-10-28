@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CountdownTimer } from './CountdownTimer'
 import { Gavel, Zap } from 'lucide-react'
+import { resolveImageUrl } from '@/lib/utils'
 
 export function AuctionCard({ auction, onSelect }) {
   const isCompleted = auction.status === 2 || new Date(auction.endTime) <= new Date()
@@ -18,7 +19,7 @@ export function AuctionCard({ auction, onSelect }) {
         {/* Image Thumbnail with status tags */}
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
           <img
-            src={auction.imageUrl || fallbackImage}
+            src={resolveImageUrl(auction.imageUrl) || fallbackImage}
             alt={auction.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => { e.target.src = fallbackImage }}

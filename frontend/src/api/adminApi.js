@@ -48,4 +48,64 @@ export const adminApi = {
     const response = await axiosClient.delete(`/auctions/admin/${id}`)
     return response.data
   },
+
+  // --- Administrator Management (Admin Protected) ---
+  getAdmins: async () => {
+    const response = await axiosClient.get('/auth/admins')
+    return response.data
+  },
+
+  createAdmin: async (adminData) => {
+    const response = await axiosClient.post('/auth/create-admin', adminData)
+    return response.data
+  },
+
+  demoteAdmin: async (id) => {
+    const response = await axiosClient.put(`/auth/admins/${id}/role`, { role: 'User' })
+    return response.data
+  },
+
+  promoteToAdmin: async (id) => {
+    const response = await axiosClient.put(`/auth/users/${id}/role`, { role: 'Admin' })
+    return response.data
+  },
+
+  updateUserRole: async (id, role) => {
+    const response = await axiosClient.put(`/auth/users/${id}/role`, { role })
+    return response.data
+  },
+
+  deleteAdmin: async (id) => {
+    const response = await axiosClient.delete(`/auth/admins/${id}`)
+    return response.data
+  },
+
+  // --- User & Account Moderation (Admin Protected) ---
+  getAllUsers: async ({ role, search } = {}) => {
+    const params = {}
+    if (role && role !== 'all') params.role = role
+    if (search) params.search = search
+    const response = await axiosClient.get('/auth/users', { params })
+    return response.data
+  },
+
+  suspendUser: async (id, { days = 7, reason } = {}) => {
+    const response = await axiosClient.put(`/auth/users/${id}/suspend`, { days, reason })
+    return response.data
+  },
+
+  banUser: async (id, { reason } = {}) => {
+    const response = await axiosClient.put(`/auth/users/${id}/ban`, { reason })
+    return response.data
+  },
+
+  reactivateUser: async (id) => {
+    const response = await axiosClient.put(`/auth/users/${id}/reactivate`)
+    return response.data
+  },
+
+  deleteUserAccount: async (id) => {
+    const response = await axiosClient.delete(`/auth/users/${id}`)
+    return response.data
+  },
 }

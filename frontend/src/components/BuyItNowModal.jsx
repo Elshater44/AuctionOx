@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Zap, ShieldCheck, PackageCheck, X } from 'lucide-react'
+import { resolveImageUrl } from '@/lib/utils'
 
 export function BuyItNowModal({
   isOpen,
@@ -52,7 +53,7 @@ export function BuyItNowModal({
           {/* Item Preview Card */}
           <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl">
             <img
-              src={auction.imageUrl || fallbackImage}
+              src={resolveImageUrl(auction.imageUrl) || fallbackImage}
               alt={auction.title}
               className="w-16 h-16 rounded-lg object-cover border border-slate-200 shrink-0 bg-slate-100"
               onError={(e) => { e.target.src = fallbackImage }}

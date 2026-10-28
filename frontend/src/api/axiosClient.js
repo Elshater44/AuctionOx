@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-// Backend running via Docker Compose (http://localhost:5050) or direct dotnet run (https://localhost:7256 / http://localhost:5218)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5050/api'
+// Backend routed via relative /api (proxied by Nginx in Docker or Vite in local dev)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
 export const axiosClient = axios.create({
   baseURL: API_BASE_URL,

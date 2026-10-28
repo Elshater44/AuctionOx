@@ -174,6 +174,14 @@ builder.Services.AddAuthentication(options =>
 
                 // If user doesn't exist by ID or Email, fail auth with 401
                 context.Fail("User account no longer exists in database.");
+                return;
+            }
+
+            // Immediately reject suspended or banned users
+            if (await userManager.IsLockedOutAsync(user))
+            {
+                context.Fail("Your account has been suspended or banned. Please contact administration.");
+                return;
             }
         }
     };

@@ -25,11 +25,11 @@ namespace AuctionOx.Controllers
         }
 
         /// <summary>
-        /// Public image delivery reverse proxy (caches for 24 hours).
+        /// Public image delivery reverse proxy (caches for 30 days).
         /// </summary>
         [HttpGet("{fileId}")]
         [AllowAnonymous]
-        [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
+        [ResponseCache(Duration = 2592000, Location = ResponseCacheLocation.Any)]
         public async Task<IActionResult> GetImage(string fileId)
         {
             if (string.IsNullOrWhiteSpace(fileId))
@@ -87,8 +87,8 @@ namespace AuctionOx.Controllers
 
             var fileId = await _storageService.UploadImageAsync(stream, file.FileName, contentType);
 
-            var baseUrl = Request != null ? $"{Request.Scheme}://{Request.Host}" : string.Empty;
-            var publicUrl = string.IsNullOrEmpty(baseUrl) ? $"/api/images/{fileId}" : $"{baseUrl}/api/images/{fileId}";
+            // Return relative path so image requests route through Nginx reverse proxy cache on any domain/port
+            var publicUrl = $"/api/images/{fileId}";
             return Ok(new
             {
                 fileId,

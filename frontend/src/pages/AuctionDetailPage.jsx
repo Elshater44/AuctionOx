@@ -20,6 +20,7 @@ import { auctionApi } from '@/api/auctionApi'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
 import { useBiddingHub } from '@/hooks/useBiddingHub'
+import { resolveImageUrl } from '@/lib/utils'
 import {
   ArrowLeft,
   Gavel,
@@ -317,7 +318,7 @@ export function AuctionDetailPage({ auctionId: propAuctionId, onBack, onNavigate
         <div className="lg:col-span-7 space-y-6">
           <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 shadow-sm">
             <img
-              src={auction.imageUrl || fallbackImage}
+              src={resolveImageUrl(auction.imageUrl) || fallbackImage}
               alt={auction.title}
               className="w-full h-full object-cover"
               onError={(e) => { e.target.src = fallbackImage }}

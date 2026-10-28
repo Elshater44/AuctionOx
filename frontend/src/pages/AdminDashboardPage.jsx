@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { CategoryManagementTab } from '@/components/admin/CategoryManagementTab'
 import { AuctionModerationTab } from '@/components/admin/AuctionModerationTab'
+import { AdminManagementTab } from '@/components/admin/AdminManagementTab'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Shield, ShieldAlert, Tag, ArrowLeft, Lock } from 'lucide-react'
+import { Shield, ShieldAlert, Tag, ArrowLeft, Lock, ShieldCheck, Users } from 'lucide-react'
 
 export function AdminDashboardPage({ onBack, onSelectAuction }) {
   const navigate = useNavigate()
@@ -100,6 +101,18 @@ export function AdminDashboardPage({ onBack, onSelectAuction }) {
           <Tag className="w-4 h-4" />
           Category Management
         </button>
+
+        <button
+          onClick={() => setActiveTab('admins')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-lg transition-all ${
+            activeTab === 'admins'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          User & Admin Accounts
+        </button>
       </div>
 
       {/* Tab Content */}
@@ -109,6 +122,9 @@ export function AdminDashboardPage({ onBack, onSelectAuction }) {
         )}
         {activeTab === 'categories' && (
           <CategoryManagementTab />
+        )}
+        {activeTab === 'admins' && (
+          <AdminManagementTab />
         )}
       </div>
     </div>

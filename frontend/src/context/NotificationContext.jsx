@@ -6,7 +6,7 @@ import { notificationApi } from '@/api/notificationApi'
 
 const NotificationContext = createContext(null)
 
-const HUB_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5050/api').replace(/\/api\/?$/, '') + '/hubs/notifications'
+const HUB_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '') + '/hubs/notifications'
 
 export function NotificationProvider({ children }) {
   const { token, isAuthenticated } = useAuth()

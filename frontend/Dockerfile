@@ -12,8 +12,8 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Set default build argument for API URL
-ARG VITE_API_URL=http://localhost:5050/api
+# Set default build argument for API URL (relative /api routes through Nginx reverse proxy)
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
 # Build production bundle

@@ -15,6 +15,7 @@ import {
   Upload,
   Loader2
 } from 'lucide-react'
+import { resolveImageUrl } from '@/lib/utils'
 
 export function CreateAuctionPage({ onBack, onSuccess }) {
   const navigate = useNavigate()
@@ -277,7 +278,7 @@ export function CreateAuctionPage({ onBack, onSuccess }) {
                 {imageUrl && imageUrl.trim() ? (
                   <div className="relative rounded-lg bg-white border border-slate-200 overflow-hidden flex items-center justify-center min-h-[160px] max-h-[220px]">
                     <img
-                      src={imageUrl.trim()}
+                      src={resolveImageUrl(imageUrl.trim())}
                       alt="Auction preview"
                       onLoad={() => setImageStatus('loaded')}
                       onError={() => setImageStatus('error')}

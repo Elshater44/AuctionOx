@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
 
-const HUB_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5050/api').replace(/\/api\/?$/, '') + '/hubs/bidding'
+const HUB_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/api\/?$/, '') + '/hubs/bidding'
 
 export function useBiddingHub(auctionId, onLiveBidsReceived) {
   const [connectionStatus, setConnectionStatus] = useState('disconnected') // 'disconnected' | 'connecting' | 'connected' | 'reconnecting'

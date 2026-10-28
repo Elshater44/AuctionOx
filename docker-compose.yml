@@ -59,6 +59,8 @@ services:
     ports:
       - "5173:80"
       - "3000:80"
+    volumes:
+      - nginx-cache:/var/cache/nginx
     depends_on:
       - api
     networks:
@@ -73,3 +75,4 @@ networks:
 
 volumes:
   mssql-data:
+  nginx-cache:
