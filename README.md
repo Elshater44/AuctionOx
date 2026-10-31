@@ -14,7 +14,6 @@
 ## 📑 Table of Contents
 
 - [System Architecture](#-system-architecture)
-  - [Tiered Structure & Flow](#tiered-structure--flow)
 - [Key Engineering Highlights](#-key-engineering-highlights)
   - [1. Database-Level Optimistic Concurrency Control (OCC)](#1-database-level-optimistic-concurrency-control-occ)
   - [2. Edge Reverse Proxy & Micro-Caching](#2-edge-reverse-proxy--micro-caching)
@@ -34,74 +33,7 @@
 
 ## 🏛️ System Architecture
 
-### Tiered Structure & Flow
-
-```mermaid
-flowchart TD
-    %% TIER 1: CLIENT
-    subgraph Tier1 ["1. Client Tier (Presentation)"]
-        direction LR
-        Browser["Web Browser"]
-        SPA["React 19 SPA (Vite)<br/>• Real-Time Hub Listener<br/>• Axios Client (JWT Interceptor)<br/>• Tailwind CSS UI"]
-        Browser <--> SPA
-    end
-
-    %% TIER 2: REVERSE PROXY & GATEWAY
-    subgraph Tier2 ["2. Edge & Gateway Tier (Nginx Container)"]
-        direction TB
-        Nginx["Nginx Reverse Proxy & Static Host"]
-        DiskCache["LRU Image Cache<br/>(/var/cache/nginx)"]
-        Nginx --- DiskCache
-    end
-
-    %% TIER 3: APPLICATION SERVICES
-    subgraph Tier3 ["3. Application Tier (.NET 10 Web API Container)"]
-        direction TB
-        subgraph Gateways ["Ingress & Real-Time Endpoints"]
-            REST["REST API Controllers<br/>• AuctionsController<br/>• BidsController<br/>• AuthController<br/>• ImagesController"]
-            Hub["SignalR AuctionHub<br/>(WebSocket Full-Duplex)"]
-        end
-
-        subgraph Core ["Core Domain Services"]
-            AuctionSvc["AuctionService<br/>(Lifecycle & Buy-It-Now)"]
-            BidSvc["BidService<br/>(OCC Retry Engine)"]
-            AuthSvc["AuthService<br/>(JWT & Moderation)"]
-            StorageSvc["TelegramStorageService<br/>(Media Streaming)"]
-        end
-
-        subgraph Workers ["Background Workers"]
-            CronWorker["AuctionEndBackgroundService<br/>(Periodic Auction Settlement)"]
-        end
-    end
-
-    %% TIER 4: PERSISTENCE & STORAGE
-    subgraph Tier4 ["4. Data & External Services"]
-        direction LR
-        SQLServer[("SQL Server 2022<br/>• EF Core 10<br/>• [Timestamp] RowVersion OCC<br/>• ASP.NET Identity")]
-        Telegram["Telegram Bot API<br/>(External Media Cloud)"]
-    end
-
-    %% Clean, Hierarchical Communication Paths
-    SPA -->|"HTTPS / REST (JWT)"| Nginx
-    SPA <-->|"WSS (WebSocket)"| Nginx
-
-    Nginx -->|"Proxy /api/*"| REST
-    Nginx <-->|"Upgrade /hubs/*"| Hub
-
-    REST --> AuctionSvc
-    REST --> BidSvc
-    REST --> AuthSvc
-    REST --> StorageSvc
-
-    BidSvc -.->|"Broadcast Bid Update"| Hub
-    AuctionSvc -.->|"Broadcast End / Winner"| Hub
-    CronWorker -->|"Check Expired Auctions"| AuctionSvc
-
-    AuctionSvc --> SQLServer
-    BidSvc --> SQLServer
-    AuthSvc --> SQLServer
-    StorageSvc --> Telegram
-```
+![AuctionOx System Architecture](docs/auctionox_architecture.jpg)
 
 ---
 
