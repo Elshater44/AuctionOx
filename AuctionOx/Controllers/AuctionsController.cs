@@ -21,9 +21,16 @@ namespace AuctionOx.Controllers
             _userManager = userManager;
         }
 
-        private async Task<bool> IsUserValidAsync(string userId)
+        private async Task<(bool IsValid, string? ErrorMessage)> ValidateUserStatusAsync(string userId)
         {
-            return await _userManager.FindByIdAsync(userId) != null;
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null || user.IsDeleted)
+                return (false, "User session is invalid or user no longer exists. Please sign in again.");
+
+            if (await _userManager.IsLockedOutAsync(user))
+                return (false, "Your account has been suspended or banned. Please contact administration.");
+
+            return (true, null);
         }
 
         [HttpGet]
@@ -52,8 +59,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || !await IsUserValidAsync(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             var result = await _auctionService.CreateAuctionAsync(userId, request);
             return CreatedAtAction(nameof(GetAuction), new { id = result.Id }, result);
@@ -64,8 +75,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> UpdateAuction(int id, [FromBody] UpdateAuctionRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || !await IsUserValidAsync(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             try
             {
@@ -85,8 +100,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> DeleteAuction(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || !await IsUserValidAsync(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             var deleted = await _auctionService.DeleteAuctionAsync(id, userId);
             if (!deleted) return NotFound();
@@ -98,8 +117,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> GetMyAuctions([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || !await IsUserValidAsync(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             var result = await _auctionService.GetMyAuctionsAsync(userId, pageNumber, pageSize);
             return Ok(result);
@@ -110,8 +133,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> BuyItNow(int id)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || !await IsUserValidAsync(userId))
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             try
             {

@@ -25,6 +25,18 @@ namespace AuctionOx.Controllers
             _userManager = userManager;
         }
 
+        private async Task<(bool IsValid, string? ErrorMessage)> ValidateUserStatusAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null || user.IsDeleted)
+                return (false, "User session is invalid or user no longer exists. Please sign in again.");
+
+            if (await _userManager.IsLockedOutAsync(user))
+                return (false, "Your account has been suspended or banned. Please contact administration.");
+
+            return (true, null);
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetBids(int auctionId)
         {
@@ -37,8 +49,12 @@ namespace AuctionOx.Controllers
         public async Task<IActionResult> PlaceBid(int auctionId, [FromBody] PlaceBidRequest request)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || await _userManager.FindByIdAsync(userId) == null)
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             try
             {
@@ -65,13 +81,29 @@ namespace AuctionOx.Controllers
             _userManager = userManager;
         }
 
+        private async Task<(bool IsValid, string? ErrorMessage)> ValidateUserStatusAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null || user.IsDeleted)
+                return (false, "User session is invalid or user no longer exists. Please sign in again.");
+
+            if (await _userManager.IsLockedOutAsync(user))
+                return (false, "Your account has been suspended or banned. Please contact administration.");
+
+            return (true, null);
+        }
+
         [Authorize]
         [HttpGet("my-bids")]
         public async Task<IActionResult> GetMyBids()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId) || await _userManager.FindByIdAsync(userId) == null)
+            if (string.IsNullOrEmpty(userId))
                 return Unauthorized(new { message = "User session is invalid or user no longer exists. Please sign in again." });
+
+            var (isValid, errorMessage) = await ValidateUserStatusAsync(userId);
+            if (!isValid)
+                return Unauthorized(new { message = errorMessage });
 
             var bids = await _bidService.GetMyBidsAsync(userId);
             return Ok(bids);

@@ -154,13 +154,13 @@ builder.Services.AddAuthentication(options =>
             }
 
             var user = await userManager.FindByIdAsync(userId);
-            if (user == null)
+            if (user == null || user.IsDeleted)
             {
                 // Auto-healing fallback: If user was re-seeded with a different ID, recover using email
                 if (!string.IsNullOrEmpty(email))
                 {
                     user = await userManager.FindByEmailAsync(email);
-                    if (user != null)
+                    if (user != null && !user.IsDeleted)
                     {
                         var idClaim = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier);
                         if (idClaim != null)
@@ -172,7 +172,7 @@ builder.Services.AddAuthentication(options =>
                     }
                 }
 
-                // If user doesn't exist by ID or Email, fail auth with 401
+                // If user doesn't exist or is deleted, fail auth with 401
                 context.Fail("User account no longer exists in database.");
                 return;
             }
